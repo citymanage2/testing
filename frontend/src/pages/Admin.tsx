@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import client from '../api/client';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 type Tab = 'tasks' | 'pricelists';
 
 interface TaskRow {
@@ -242,6 +244,14 @@ function TasksTab() {
                       >
                         Детали
                       </button>
+                      <a
+                        href={`${API_BASE}/admin/tasks/${task.id}/download-input/0`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ ...actionBtn('#4caf50'), marginLeft: 6, textDecoration: 'none', display: 'inline-block' }}
+                      >
+                        Скачать файл
+                      </a>
                       <button
                         onClick={() => handleDelete(task.id)}
                         style={{ ...actionBtn('#f44336'), marginLeft: 6 }}

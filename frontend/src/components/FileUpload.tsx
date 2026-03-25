@@ -88,7 +88,7 @@ export default function FileUpload({ files, onChange, maxFiles = 5, maxSizeMb = 
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
           {files.map((file, i) => (
             <li
-              key={i}
+              key={`${file.name}-${file.size}-${i}`}
               style={{
                 display: 'flex',
                 alignItems: 'center',

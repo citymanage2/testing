@@ -48,6 +48,24 @@ export default function ProjectsSidebar() {
     }
   }
 
+  const [dragOver, setDragOver] = useState<string | null>(null);
+
+  async function handleDrop(projectId: string, e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(null);
+    const taskId = e.dataTransfer.getData('text/plain');
+    if (!taskId) return;
+    try {
+      await client.post(`/projects/${projectId}/estimates/${taskId}`);
+      if (expanded === projectId) {
+        const { data } = await client.get<ProjectDetail>(`/projects/${projectId}`);
+        setProjectDetail(data);
+      }
+    } catch {
+      alert('Ошибка добавления задачи в проект');
+    }
+  }
+
   async function handleProjectClick(id: string) {
     if (expanded === id) {
       setExpanded(null);
@@ -95,13 +113,16 @@ export default function ProjectsSidebar() {
         <div key={project.id} style={{ marginBottom: 4 }}>
           <div
             onClick={() => handleProjectClick(project.id)}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(project.id); }}
+            onDragLeave={() => setDragOver(null)}
+            onDrop={(e) => handleDrop(project.id, e)}
             style={{
               display: 'flex',
               alignItems: 'center',
               padding: '7px 10px',
               borderRadius: 4,
               cursor: 'pointer',
-              background: expanded === project.id ? '#e3f2fd' : 'transparent',
+              background: dragOver === project.id ? '#bbdefb' : expanded === project.id ? '#e3f2fd' : 'transparent',
               color: '#333',
               fontSize: 13,
               fontWeight: 500,

@@ -168,7 +168,7 @@ export default function TaskStatus() {
               >
                 <span>{file.filename}</span>
                 <a
-                  href={`${API_BASE}/tasks/${id}/results/${file.id}/download`}
+                  href={`${API_BASE}/results/${file.id}/download`}
                   target="_blank"
                   rel="noreferrer"
                   style={{
