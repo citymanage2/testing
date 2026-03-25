@@ -19,7 +19,7 @@ app = FastAPI(title="Smeta AI", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://testing.onrender.com"],
+    allow_origins=["https://testing-frontend-52jt.onrender.com"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
