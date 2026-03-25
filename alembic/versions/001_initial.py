@@ -164,8 +164,23 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
+    op.create_index('ix_projects_user_id', 'projects', ['user_id'])
+    op.create_index('ix_tasks_user_id', 'tasks', ['user_id'])
+    op.create_index('ix_tasks_project_id', 'tasks', ['project_id'])
+    op.create_index('ix_task_input_files_task_id', 'task_input_files', ['task_id'])
+    op.create_index('ix_task_results_task_id', 'task_results', ['task_id'])
+    op.create_index('ix_task_versions_task_id', 'task_versions', ['task_id'])
+    op.create_index('ix_estimate_items_task_id', 'estimate_items', ['task_id'])
+
 
 def downgrade() -> None:
+    op.drop_index('ix_estimate_items_task_id', table_name='estimate_items')
+    op.drop_index('ix_task_versions_task_id', table_name='task_versions')
+    op.drop_index('ix_task_results_task_id', table_name='task_results')
+    op.drop_index('ix_task_input_files_task_id', table_name='task_input_files')
+    op.drop_index('ix_tasks_project_id', table_name='tasks')
+    op.drop_index('ix_tasks_user_id', table_name='tasks')
+    op.drop_index('ix_projects_user_id', table_name='projects')
     op.drop_table("price_lists")
     op.drop_table("price_materials")
     op.drop_table("price_works")
