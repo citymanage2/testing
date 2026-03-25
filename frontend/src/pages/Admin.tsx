@@ -92,7 +92,7 @@ function TasksTab() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<Record<string, unknown> | null>(null);
   const PAGE_SIZE = 20;
@@ -211,7 +211,11 @@ function TasksTab() {
 
       {loading && <p style={{ color: '#aaa' }}>Загрузка...</p>}
 
-      {!loading && (
+      {!loading && tasks.length === 0 && (
+        <p style={{ textAlign: 'center', color: '#aaa', padding: '24px 0' }}>Задач нет</p>
+      )}
+
+      {!loading && tasks.length > 0 && (
         <>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
@@ -224,14 +228,7 @@ function TasksTab() {
               </tr>
             </thead>
             <tbody>
-              {tasks.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ padding: 16, textAlign: 'center', color: '#aaa' }}>
-                    Нет задач
-                  </td>
-                </tr>
-              ) : (
-                tasks.map((task) => (
+              {tasks.map((task) => (
                   <tr key={task.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
                     <td style={tdStyle}>{task.id}</td>
                     <td style={tdStyle}>{task.task_type}</td>
