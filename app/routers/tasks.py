@@ -1,7 +1,6 @@
 import asyncio
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
-from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.auth import get_current_user, CurrentUser
@@ -146,19 +145,3 @@ async def get_task_results(
         TaskResultFile(id=r.id, file_name=r.file_name, mime_type=r.mime_type, created_at=r.created_at)
         for r in results
     ]
-
-
-@router.get("/results/{file_id}/download")
-async def download_result(
-    file_id: int,
-    current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.get(TaskResult, file_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="File not found")
-    return Response(
-        content=result.file_data,
-        media_type=result.mime_type,
-        headers={"Content-Disposition": f'attachment; filename="{result.file_name}"'},
-    )

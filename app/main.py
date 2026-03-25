@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine
 from app.models import Base  # импортирует все модели
 from app.services.price_service import price_service
-from app.routers import auth, tasks, projects, admin
+from app.routers import auth, tasks, projects, admin, results
 
 
 @asynccontextmanager
@@ -29,6 +29,7 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 app.include_router(projects.router, prefix="/projects", tags=["projects"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+app.include_router(results.router, prefix="/results", tags=["results"])
 
 
 @app.get("/health")
