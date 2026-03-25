@@ -22,10 +22,12 @@ def _get_admin_hash() -> str:
 
 @router.post("/login", response_model=LoginResponse)
 async def login(body: LoginRequest):
-    if verify_password(body.password, _get_admin_hash()):
+    admin_match = verify_password(body.password, _get_admin_hash())
+    user_match = verify_password(body.password, _get_user_hash())
+    if admin_match:
         token = create_access_token(2, "admin")
         return LoginResponse(access_token=token, role="admin", expires_in=settings.jwt_expire_hours * 3600)
-    if verify_password(body.password, _get_user_hash()):
+    if user_match:
         token = create_access_token(1, "user")
         return LoginResponse(access_token=token, role="user", expires_in=settings.jwt_expire_hours * 3600)
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password")
