@@ -88,6 +88,4 @@ def generate_comparison_report(comparison_data: dict) -> bytes:
             pdf.multi_cell(0, 6, f"{i}. {rec}")
         pdf.ln(3)
 
-    buf = io.BytesIO()
-    pdf.output(buf)
-    return buf.getvalue()
+    return pdf.output()

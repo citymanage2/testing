@@ -109,7 +109,7 @@ class AnalogueService:
         )
 
         original_id = item.original_item_id
-        await db.delete(item)
+        db.delete(item)
 
         # Вернуть оригинал на его позицию
         if original_id:
