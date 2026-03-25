@@ -1,0 +1,16 @@
+fastapi==0.115.5
+uvicorn[standard]
+sqlalchemy[asyncio]==2.0.*
+asyncpg
+alembic
+anthropic
+openpyxl==3.1.5
+fpdf2>=2.8.0
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+slowapi
+structlog
+pydantic>=2.0
+pydantic-settings
+pypdf>=4.0
