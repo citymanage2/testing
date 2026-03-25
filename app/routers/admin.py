@@ -129,9 +129,16 @@ async def upload_works_price_list(
     db.add(pl)
 
     # Parse and upsert price works
-    wb = load_workbook(io.BytesIO(data), read_only=True)
-    ws = wb.active
-    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    try:
+        wb = load_workbook(io.BytesIO(data), read_only=True)
+        ws = wb.active
+        if ws is None:
+            raise HTTPException(status_code=400, detail="XLSX file has no active sheet")
+        rows = list(ws.iter_rows(min_row=2, values_only=True))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid XLSX file: {e}")
     for row in rows:
         if not row or not row[0]:
             continue
@@ -155,7 +162,10 @@ async def upload_works_price_list(
             db.add(PriceWork(name=name, unit=unit, prices=prices_raw, min_price=min_price))
 
     await db.commit()
-    await price_service.reload_cache()
+    try:
+        await price_service.reload_cache()
+    except Exception:
+        pass  # Data persisted; cache refreshes on next startup
     return {"ok": True}
 
 
@@ -179,9 +189,16 @@ async def upload_materials_price_list(
     pl = PriceList(type="materials", filename=file.filename, content=data)
     db.add(pl)
 
-    wb = load_workbook(io.BytesIO(data), read_only=True)
-    ws = wb.active
-    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    try:
+        wb = load_workbook(io.BytesIO(data), read_only=True)
+        ws = wb.active
+        if ws is None:
+            raise HTTPException(status_code=400, detail="XLSX file has no active sheet")
+        rows = list(ws.iter_rows(min_row=2, values_only=True))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid XLSX file: {e}")
     for row in rows:
         if not row or not row[0]:
             continue
@@ -200,5 +217,8 @@ async def upload_materials_price_list(
             db.add(PriceMaterial(name=name, unit=unit, price=price))
 
     await db.commit()
-    await price_service.reload_cache()
+    try:
+        await price_service.reload_cache()
+    except Exception:
+        pass  # Data persisted; cache refreshes on next startup
     return {"ok": True}
