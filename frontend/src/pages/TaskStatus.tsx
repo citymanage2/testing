@@ -29,6 +29,7 @@ export default function TaskStatus() {
   const [chatInput, setChatInput] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [copied, setCopied] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -59,6 +60,44 @@ export default function TaskStatus() {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [id, task?.status]);
+
+  function buildLogText(): string {
+    if (!task) return '';
+    const lines: string[] = [
+      `Задача: ${task.id}`,
+      `Тип: ${task.task_type}`,
+      `Статус: ${task.status}`,
+      `Создана: ${new Date(task.created_at).toLocaleString('ru-RU')}`,
+    ];
+    if (task.error_message) lines.push(`Ошибка: ${task.error_message}`);
+    const messages = task.messages ?? [];
+    if (messages.length > 0) {
+      lines.push('', '--- Сообщения ---');
+      messages.forEach((msg) => {
+        const role = msg.role === 'user' ? 'Вы' : 'AI';
+        lines.push(`[${msg.created_at ? new Date(msg.created_at).toLocaleString('ru-RU') : ''}] ${role}: ${msg.content}`);
+      });
+    }
+    return lines.join('\n');
+  }
+
+  function handleDownloadLogs() {
+    const text = buildLogText();
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `task-${id}-log.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleCopyLogs() {
+    const text = buildLogText();
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   async function sendMessage() {
     if (!id || !chatInput.trim()) return;
@@ -247,6 +286,49 @@ export default function TaskStatus() {
             {sendingMessage ? '...' : 'Отправить'}
           </button>
         </div>
+      </div>
+
+      {/* Log actions */}
+      <div
+        style={{
+          marginTop: 32,
+          paddingTop: 16,
+          borderTop: '1px solid #e0e0e0',
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+        }}
+      >
+        <span style={{ fontSize: 13, color: '#888', marginRight: 4 }}>Логи:</span>
+        <button
+          onClick={handleDownloadLogs}
+          style={{
+            padding: '6px 14px',
+            background: '#546e7a',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 4,
+            cursor: 'pointer',
+            fontSize: 13,
+          }}
+        >
+          Скачать .txt
+        </button>
+        <button
+          onClick={handleCopyLogs}
+          style={{
+            padding: '6px 14px',
+            background: copied ? '#4caf50' : '#78909c',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 4,
+            cursor: 'pointer',
+            fontSize: 13,
+            transition: 'background 0.2s',
+          }}
+        >
+          {copied ? 'Скопировано!' : 'Копировать'}
+        </button>
       </div>
     </div>
   );
