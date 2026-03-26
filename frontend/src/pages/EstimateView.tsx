@@ -81,14 +81,9 @@ export default function EstimateView() {
     URL.revokeObjectURL(url);
   }
 
-  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return;
-    setImporting(true);
-    try {
-      const fd = new FormData(); fd.append('file', file);
-      // Import into current task's project — need project_id; use task move approach
-      alert('Импорт создаёт новую задачу в том же проекте. Используйте кнопку в боковой панели проекта.');
-    } finally { setImporting(false); if (importRef.current) importRef.current.value = ''; }
+  function handleImport() {
+    alert('Импорт создаёт новую задачу в проекте. Используйте кнопку "Импорт Excel" в боковой панели проекта.');
+    if (importRef.current) importRef.current.value = '';
   }
 
   async function checkPairs() {
