@@ -41,3 +41,4 @@ async def get_admin_user(current_user: User = Depends(get_current_user)) -> User
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+AdminUser = Annotated[User, Depends(get_admin_user)]

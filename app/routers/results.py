@@ -11,7 +11,7 @@ router = APIRouter()
 @router.get("/{file_id}/download")
 async def download_result(
     file_id: int,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.get(TaskResult, file_id)

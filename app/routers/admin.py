@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from app.auth import get_admin_user, CurrentUser
+from app.auth import AdminUser
 from app.database import get_db
 from app.models.task import Task
 from app.models.task_input_file import TaskInputFile
@@ -21,7 +21,7 @@ async def list_tasks(
     date_to: datetime | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    admin_user: CurrentUser = Depends(get_admin_user),
+    admin_user: AdminUser,
     db: AsyncSession = Depends(get_db),
 ):
     filters = []
@@ -52,7 +52,7 @@ async def list_tasks(
 
 
 @router.get("/tasks/{task_id}", response_model=AdminTaskDetail)
-async def get_task_detail(task_id: str, admin_user: CurrentUser = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+async def get_task_detail(task_id: str, admin_user: AdminUser, db: AsyncSession = Depends(get_db)):
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -65,7 +65,7 @@ async def get_task_detail(task_id: str, admin_user: CurrentUser = Depends(get_ad
 
 
 @router.delete("/tasks/{task_id}", status_code=204)
-async def delete_task(task_id: str, admin_user: CurrentUser = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+async def delete_task(task_id: str, admin_user: AdminUser, db: AsyncSession = Depends(get_db)):
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -74,7 +74,7 @@ async def delete_task(task_id: str, admin_user: CurrentUser = Depends(get_admin_
 
 
 @router.get("/tasks/{task_id}/download-input/{file_index}")
-async def download_input(task_id: str, file_index: int, admin_user: CurrentUser = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+async def download_input(task_id: str, file_index: int, admin_user: AdminUser, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(TaskInputFile).where(TaskInputFile.task_id == task_id, TaskInputFile.file_index == file_index))
     f = result.scalar_one_or_none()
     if not f:
@@ -83,7 +83,7 @@ async def download_input(task_id: str, file_index: int, admin_user: CurrentUser 
 
 
 @router.get("/price-lists/info", response_model=PriceListInfo)
-async def get_price_lists_info(admin_user: CurrentUser = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+async def get_price_lists_info(admin_user: AdminUser, db: AsyncSession = Depends(get_db)):
     async def get_info(type_: str):
         result = await db.execute(select(PriceList).where(PriceList.type == type_).order_by(PriceList.updated_at.desc()).limit(1))
         pl = result.scalar_one_or_none()
@@ -92,7 +92,7 @@ async def get_price_lists_info(admin_user: CurrentUser = Depends(get_admin_user)
 
 
 @router.post("/price-lists/works")
-async def upload_works(file: UploadFile = File(...), admin_user: CurrentUser = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+async def upload_works(admin_user: AdminUser, db: AsyncSession = Depends(get_db), file: UploadFile = File(...)):
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="Only .xlsx files allowed")
     data = await file.read()
@@ -130,7 +130,7 @@ async def upload_works(file: UploadFile = File(...), admin_user: CurrentUser = D
 
 
 @router.post("/price-lists/materials")
-async def upload_materials(file: UploadFile = File(...), admin_user: CurrentUser = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+async def upload_materials(admin_user: AdminUser, db: AsyncSession = Depends(get_db), file: UploadFile = File(...)):
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="Only .xlsx files allowed")
     data = await file.read()

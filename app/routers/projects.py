@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 @router.post("", response_model=ProjectResponse, status_code=201)
-async def create_project(body: ProjectCreate, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def create_project(body: ProjectCreate, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     project = Project(id=str(uuid.uuid4()), name=body.name, description=body.description, user_id=current_user.id)
     db.add(project)
     await db.commit()
@@ -26,13 +26,13 @@ async def create_project(body: ProjectCreate, current_user: CurrentUser = Depend
 
 
 @router.get("", response_model=list[ProjectResponse])
-async def list_projects(current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def list_projects(current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Project).where(Project.user_id == current_user.id).order_by(Project.updated_at.desc()))
     return result.scalars().all()
 
 
 @router.get("/{project_id}", response_model=ProjectDetailResponse)
-async def get_project(project_id: str, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_project(project_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     project = await db.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -45,7 +45,7 @@ async def get_project(project_id: str, current_user: CurrentUser = Depends(get_c
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
-async def update_project(project_id: str, body: ProjectUpdate, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def update_project(project_id: str, body: ProjectUpdate, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     project = await db.get(Project, project_id)
     if not project or project.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -57,7 +57,7 @@ async def update_project(project_id: str, body: ProjectUpdate, current_user: Cur
 
 
 @router.delete("/{project_id}", status_code=204)
-async def delete_project(project_id: str, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def delete_project(project_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     project = await db.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -66,7 +66,7 @@ async def delete_project(project_id: str, current_user: CurrentUser = Depends(ge
 
 
 @router.post("/{project_id}/estimates/{task_id}")
-async def assign_task(project_id: str, task_id: str, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def assign_task(project_id: str, task_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -76,7 +76,7 @@ async def assign_task(project_id: str, task_id: str, current_user: CurrentUser =
 
 
 @router.patch("/estimates/{task_id}/status")
-async def update_estimate_status(task_id: str, body: EstimateStatusUpdate, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def update_estimate_status(task_id: str, body: EstimateStatusUpdate, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -88,7 +88,7 @@ async def update_estimate_status(task_id: str, body: EstimateStatusUpdate, curre
 
 
 @router.get("/estimates/{task_id}/items", response_model=EstimateItemsResponse)
-async def get_estimate_items(task_id: str, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_estimate_items(task_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.position))
     items = result.scalars().all()
     total_work = sum(i.work_price * i.quantity for i in items)
@@ -103,46 +103,46 @@ async def get_estimate_items(task_id: str, current_user: CurrentUser = Depends(g
 
 
 @router.get("/estimates/{task_id}/versions", response_model=list[VersionResponse])
-async def get_versions(task_id: str, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_versions(task_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(TaskVersion).where(TaskVersion.task_id == task_id).order_by(TaskVersion.version_number.desc()))
     return [VersionResponse.model_validate(v) for v in result.scalars().all()]
 
 
 @router.post("/estimates/{task_id}/versions/{version_id}/restore")
-async def restore_version(task_id: str, version_id: str, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def restore_version(task_id: str, version_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     from app.services.snapshot_service import snapshot_service
     await snapshot_service.restore_snapshot(db, task_id, version_id)
     return {"ok": True}
 
 
 @router.post("/estimates/{task_id}/optimize/plan")
-async def get_optimization_plan(task_id: str, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_optimization_plan(task_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     from app.services.optimization_service import optimization_service
     return await optimization_service.get_optimization_plan(db, task_id)
 
 
 @router.post("/estimates/{task_id}/optimize/execute")
-async def execute_optimization(task_id: str, body: OptimizeExecuteRequest, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def execute_optimization(task_id: str, body: OptimizeExecuteRequest, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     from app.services.optimization_service import optimization_service
     await optimization_service.execute_optimization(db, task_id, body.item_ids)
     return {"ok": True}
 
 
 @router.post("/estimates/{task_id}/items/{item_id}/find-analogues")
-async def find_analogues(task_id: str, item_id: str, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def find_analogues(task_id: str, item_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     from app.services.analogue_service import analogue_service
     return await analogue_service.find_analogues(db, task_id, item_id)
 
 
 @router.post("/estimates/{task_id}/items/{item_id}/apply-analogue")
-async def apply_analogue(task_id: str, item_id: str, body: ApplyAnalogueRequest, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def apply_analogue(task_id: str, item_id: str, body: ApplyAnalogueRequest, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     from app.services.analogue_service import analogue_service
     await analogue_service.apply_analogue(db, task_id, item_id, body.model_dump())
     return {"ok": True}
 
 
 @router.post("/estimates/{task_id}/items/{item_id}/revert-analogue")
-async def revert_analogue(task_id: str, item_id: str, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def revert_analogue(task_id: str, item_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     from app.services.analogue_service import analogue_service
     await analogue_service.revert_analogue(db, task_id, item_id)
     return {"ok": True}

@@ -19,7 +19,7 @@ async def create_task(
     task_type: str = Form(...),
     prompt: str | None = Form(None),
     files: list[UploadFile] = File(default=[]),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     if task_type not in TASK_TYPES:
@@ -60,7 +60,7 @@ async def create_task(
 @router.get("/{task_id}/status", response_model=TaskStatusResponse)
 async def get_status(
     task_id: str,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     task = await db.get(Task, task_id)
@@ -81,7 +81,7 @@ async def get_status(
 @router.post("/{task_id}/cancel")
 async def cancel_task(
     task_id: str,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     task = await db.get(Task, task_id)
@@ -98,7 +98,7 @@ async def cancel_task(
 async def send_message(
     task_id: str,
     body: MessageRequest,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     task = await db.get(Task, task_id)
@@ -116,7 +116,7 @@ async def send_message(
 @router.get("/{task_id}/results", response_model=list[TaskResultFile])
 async def get_results(
     task_id: str,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(TaskResult).where(TaskResult.task_id == task_id))
