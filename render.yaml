@@ -1,13 +1,13 @@
 services:
   - type: web
-    name: smeta-backend
+    name: pesochnica-backend
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: smeta-db
+          name: pesochnica-db
           property: connectionString
       - key: ANTHROPIC_API_KEY
         sync: false
@@ -21,7 +21,7 @@ services:
         sync: false
 
   - type: web
-    name: smeta-frontend
+    name: pesochnica-frontend
     env: static
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
@@ -30,5 +30,5 @@ services:
         sync: false
 
 databases:
-  - name: smeta-db
+  - name: pesochnica-db
     plan: free
