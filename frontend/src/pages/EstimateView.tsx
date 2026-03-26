@@ -29,7 +29,6 @@ export default function EstimateView() {
   const [pairResult, setPairResult] = useState<PairResult | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [showMove, setShowMove] = useState(false);
-  const [importing, setImporting] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -64,7 +63,7 @@ export default function EstimateView() {
     } catch { setEditCell(null); }
   }
 
-  function editInput(item: Item, field: string, numeric: boolean) {
+  function editInput(item: Item, field: string) {
     const active = editCell?.itemId === item.id && editCell?.field === field;
     const display = field === 'work_price' ? fmt(item.price_work) : field === 'mat_price' ? fmt(item.price_material) : field === 'quantity' ? String(item.quantity) : item.source_url || '';
     if (active) return (
@@ -173,15 +172,15 @@ export default function EstimateView() {
                     {item.is_optimized && <span style={{ marginLeft: 4, padding: '1px 5px', background: '#ff9800', color: '#fff', borderRadius: 10, fontSize: 10 }}>опт</span>}
                   </td>
                   <td style={td}>{item.unit}</td>
-                  <td style={{ ...td, minWidth: 60 }}>{editInput(item, 'quantity', true)}</td>
-                  <td style={{ ...td, minWidth: 80 }}>{editInput(item, 'work_price', true)}</td>
-                  <td style={{ ...td, minWidth: 80 }}>{editInput(item, 'mat_price', true)}</td>
+                  <td style={{ ...td, minWidth: 60 }}>{editInput(item, 'quantity')}</td>
+                  <td style={{ ...td, minWidth: 80 }}>{editInput(item, 'work_price')}</td>
+                  <td style={{ ...td, minWidth: 80 }}>{editInput(item, 'mat_price')}</td>
                   <td style={td}>{fmt(item.total)}</td>
                   <td style={{ ...td, minWidth: 120 }}>
                     {item.type === 'Материал' && (
                       item.source_url
                         ? <a href={item.source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#1565c0', wordBreak: 'break-all' }}>🔗 {item.source_url.replace(/^https?:\/\//, '').slice(0, 25)}…</a>
-                        : editInput(item, 'source_url', false)
+                        : editInput(item, 'source_url')
                     )}
                   </td>
                   <td style={td}>
