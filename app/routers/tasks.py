@@ -16,6 +16,7 @@ router = APIRouter()
 
 @router.post("", status_code=201)
 async def create_task(
+    *,
     task_type: str = Form(...),
     prompt: str | None = Form(None),
     files: list[UploadFile] = File(default=[]),
