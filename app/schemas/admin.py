@@ -26,6 +26,12 @@ class AdminTaskDetail(BaseModel):
 
     model_config = {"from_attributes": True}
 
+class TasksPage(BaseModel):
+    items: list[AdminTaskResponse]
+    total: int
+    page: int
+    page_size: int
+
 class PriceListInfo(BaseModel):
     works: dict | None
     materials: dict | None

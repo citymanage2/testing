@@ -3,18 +3,18 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.auth import get_admin_user, CurrentUser
 from app.database import get_db
 from app.models.task import Task
 from app.models.task_input_file import TaskInputFile
 from app.models.price import PriceList
-from app.schemas.admin import AdminTaskResponse, AdminTaskDetail, PriceListInfo
+from app.schemas.admin import AdminTaskResponse, AdminTaskDetail, PriceListInfo, TasksPage
 
 router = APIRouter()
 
 
-@router.get("/tasks", response_model=list[AdminTaskResponse])
+@router.get("/tasks", response_model=TasksPage)
 async def list_tasks(
     status: str | None = Query(None),
     task_type: str | None = Query(None),
@@ -25,18 +25,35 @@ async def list_tasks(
     admin_user: CurrentUser = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
-    q = select(Task)
+    filters = []
     if status:
-        q = q.where(Task.status == status)
+        filters.append(Task.status == status)
     if task_type:
-        q = q.where(Task.task_type == task_type)
+        filters.append(Task.task_type == task_type)
     if date_from:
-        q = q.where(Task.created_at >= date_from)
+        filters.append(Task.created_at >= date_from)
     if date_to:
-        q = q.where(Task.created_at <= date_to)
+        filters.append(Task.created_at <= date_to)
+
+    count_q = select(func.count()).select_from(Task)
+    if filters:
+        count_q = count_q.where(*filters)
+    total_result = await db.execute(count_q)
+    total = total_result.scalar_one()
+
+    q = select(Task)
+    if filters:
+        q = q.where(*filters)
     q = q.order_by(Task.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(q)
-    return result.scalars().all()
+    items = result.scalars().all()
+
+    return TasksPage(
+        items=[AdminTaskResponse.model_validate(t) for t in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/tasks/{task_id}", response_model=AdminTaskDetail)
