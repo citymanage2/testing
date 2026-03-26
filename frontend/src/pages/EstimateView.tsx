@@ -9,7 +9,7 @@ import AnaloguePanel from '../components/AnaloguePanel';
 interface Item {
   id: string; position: number; section: string; type: string; name: string;
   unit: string; quantity: number; price_work: number; price_material: number;
-  total: number; is_analogue: boolean; is_optimized: boolean; source_url?: string;
+  total: number; is_analogue: boolean; is_optimized: boolean; source_url?: string; comment?: string;
 }
 interface EstimateData { items: Item[]; vat_rate: number; total_work: number; total_mat: number; total: number; total_vat: number; estimate_status: string; }
 interface Project { id: string; name: string; }
@@ -29,6 +29,9 @@ export default function EstimateView() {
   const [pairResult, setPairResult] = useState<PairResult | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [showMove, setShowMove] = useState(false);
+  const [showKP, setShowKP] = useState(false);
+  const [kpSelected, setKpSelected] = useState<Set<string>>(new Set());
+  const [kpComment, setKpComment] = useState('');
   const importRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -56,6 +59,7 @@ export default function EstimateView() {
     else if (editCell.field === 'mat_price') patch.mat_price = parseFloat(editVal) || 0;
     else if (editCell.field === 'quantity') patch.quantity = parseFloat(editVal) || 1;
     else if (editCell.field === 'source_url') patch.source_url = editVal.trim();
+    else if (editCell.field === 'comment') patch.comment = editVal;
     try {
       await client.patch(`/projects/estimates/${id}/items/${item.id}`, patch);
       setEditCell(null);
@@ -65,7 +69,7 @@ export default function EstimateView() {
 
   function editInput(item: Item, field: string) {
     const active = editCell?.itemId === item.id && editCell?.field === field;
-    const display = field === 'work_price' ? fmt(item.price_work) : field === 'mat_price' ? fmt(item.price_material) : field === 'quantity' ? String(item.quantity) : item.source_url || '';
+    const display = field === 'work_price' ? fmt(item.price_work) : field === 'mat_price' ? fmt(item.price_material) : field === 'quantity' ? String(item.quantity) : field === 'comment' ? (item.comment || '') : (item.source_url || '');
     if (active) return (
       <input autoFocus value={editVal} onChange={e => setEditVal(e.target.value)}
         onBlur={() => saveEdit(item)} onKeyDown={e => { if (e.key === 'Enter') saveEdit(item); if (e.key === 'Escape') setEditCell(null); }}
@@ -95,6 +99,16 @@ export default function EstimateView() {
     try { setProjects((await client.get<Project[]>('/projects')).data); } catch {}
   }
 
+  async function exportKP() {
+    const materials = data?.items.filter(i => i.type === 'Материал') || [];
+    const ids = kpSelected.size > 0 ? Array.from(kpSelected) : materials.map(i => i.id);
+    const resp = await client.post(`/projects/estimates/${id}/kp-request`, { item_ids: ids, comment: kpComment }, { responseType: 'blob' });
+    const url = URL.createObjectURL(resp.data);
+    const a = document.createElement('a'); a.href = url; a.download = 'kp_request.xlsx'; a.click();
+    URL.revokeObjectURL(url);
+    setShowKP(false);
+  }
+
   async function moveToProject(projectId: string) {
     await client.post(`/projects/estimates/${id}/move`, { project_id: projectId });
     setShowMove(false);
@@ -117,7 +131,8 @@ export default function EstimateView() {
           <button onClick={() => setShowHistory(true)} style={btn('#757575')}>История</button>
           <button onClick={() => setShowOpt(true)} style={btn('#ff9800')}>Оптимизировать</button>
           <button onClick={checkPairs} style={btn('#7b1fa2')}>Проверить пары</button>
-          <button onClick={() => { loadProjects(); setShowMove(true); }} style={btn('#00796b')}>Переместить</button>
+          <button onClick={() => { setShowMove(false); loadProjects(); setShowMove(true); }} style={btn('#00796b')}>Переместить</button>
+          <button onClick={() => { setKpSelected(new Set()); setKpComment(''); setShowKP(true); }} style={btn('#e65100')}>Запрос КП</button>
         </div>
       </div>
 
@@ -148,7 +163,7 @@ export default function EstimateView() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#f5f5f5' }}>
-              {['№', 'Раздел', 'Тип', 'Наименование', 'Ед.', 'Кол-во', 'Цена работ', 'Цена мат.', 'Стоимость', 'Источник', ''].map(h => (
+              {['№', 'Раздел', 'Тип', 'Наименование', 'Ед.', 'Кол-во', 'Цена работ', 'Цена мат.', 'Стоимость', 'Источник', 'Комментарий', ''].map(h => (
                 <th key={h} style={{ padding: '8px 8px', textAlign: 'left', border: '1px solid #e0e0e0', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -178,6 +193,7 @@ export default function EstimateView() {
                         : editInput(item, 'source_url')
                     )}
                   </td>
+                  <td style={{ ...td, minWidth: 120 }}>{editInput(item, 'comment')}</td>
                   <td style={td}>
                     {item.type === 'Материал' && (
                       <button onClick={() => setAnalogueItemId(item.id)} style={{ padding: '2px 8px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Аналоги</button>
@@ -231,6 +247,43 @@ export default function EstimateView() {
               <button key={p.id} onClick={() => moveToProject(p.id)} style={{ display: 'block', width: '100%', padding: '8px 12px', marginBottom: 8, border: '1px solid #ccc', borderRadius: 4, background: '#fff', cursor: 'pointer', textAlign: 'left', fontSize: 14 }}>{p.name}</button>
             ))}
             <button onClick={() => setShowMove(false)} style={{ marginTop: 8, padding: '6px 16px', border: 'none', borderRadius: 4, background: '#eee', cursor: 'pointer' }}>Отмена</button>
+          </div>
+        </div>
+      )}
+
+      {/* KP Request modal */}
+      {showKP && data && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: '#fff', borderRadius: 8, padding: 24, width: '90%', maxWidth: 600, maxHeight: '80vh', overflowY: 'auto' }}>
+            <h3 style={{ margin: '0 0 12px' }}>Запрос коммерческих предложений</h3>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Общий комментарий для поставщиков:</label>
+              <textarea value={kpComment} onChange={e => setKpComment(e.target.value)} rows={3} placeholder="Пример: Доставка до объекта, оплата по факту, срок — 2 недели..." style={{ width: '100%', padding: '8px', fontSize: 13, borderRadius: 4, border: '1px solid #ccc', resize: 'vertical', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ marginBottom: 12, fontSize: 13, fontWeight: 600 }}>Выберите материалы (по умолчанию — все):</div>
+            <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 4, padding: 8, marginBottom: 16 }}>
+              {data.items.filter(i => i.type === 'Материал').map(item => (
+                <label key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 0', fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={kpSelected.size === 0 || kpSelected.has(item.id)}
+                    onChange={e => {
+                      const all = data.items.filter(i => i.type === 'Материал');
+                      if (kpSelected.size === 0) {
+                        const s = new Set(all.map(i => i.id)); s.delete(item.id);
+                        setKpSelected(s);
+                      } else {
+                        const s = new Set(kpSelected);
+                        e.target.checked ? s.add(item.id) : s.delete(item.id);
+                        if (s.size === all.length) setKpSelected(new Set()); else setKpSelected(s);
+                      }
+                    }} style={{ marginTop: 2 }} />
+                  <span><strong>{item.name}</strong> — {item.quantity} {item.unit}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowKP(false)} style={{ padding: '8px 16px', border: 'none', borderRadius: 4, background: '#eee', cursor: 'pointer' }}>Отмена</button>
+              <button onClick={exportKP} style={{ padding: '8px 20px', border: 'none', borderRadius: 4, background: '#e65100', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>⬇ Скачать Excel</button>
+            </div>
           </div>
         </div>
       )}

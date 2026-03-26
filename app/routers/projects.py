@@ -15,7 +15,7 @@ from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, P
 from app.schemas.estimate import (
     EstimateItemsResponse, EstimateItemSchema, EstimateItemUpdate, EstimateStatusUpdate,
     VersionResponse, OptimizeExecuteRequest, ApplyAnalogueRequest,
-    MoveTaskRequest, ProjectTotals, PairCheckResult,
+    MoveTaskRequest, ProjectTotals, PairCheckResult, KPRequestCreate,
 )
 
 router = APIRouter()
@@ -165,6 +165,7 @@ async def update_item(task_id: str, item_id: str, body: EstimateItemUpdate, curr
     if body.work_price is not None: item.work_price = body.work_price
     if body.mat_price is not None: item.mat_price = body.mat_price
     if body.source_url is not None: item.source_url = body.source_url
+    if body.comment is not None: item.comment = body.comment
     item.total = (item.work_price + item.mat_price) * item.quantity
     await db.commit()
     return EstimateItemSchema.model_validate(item)
@@ -255,3 +256,17 @@ async def check_pairs(task_id: str, current_user: CurrentUser, db: AsyncSession 
     ok = not mat_without and not work_without
     summary = "Все позиции имеют пары." if ok else f"Материалов без работ: {len(mat_without)}, работ без материалов: {len(work_without)}"
     return PairCheckResult(ok=ok, materials_without_work=mat_without[:20], works_without_material=work_without[:20], summary=summary)
+
+
+@router.post("/estimates/{task_id}/kp-request")
+async def kp_request(task_id: str, body: KPRequestCreate, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    from app.services.excel_service import build_kp_excel
+    q = select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.position)
+    items = (await db.execute(q)).scalars().all()
+    if body.item_ids:
+        items = [i for i in items if i.id in set(body.item_ids)]
+    else:
+        items = [i for i in items if i.type == "Материал"]
+    data = build_kp_excel(items, body.comment)
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": 'attachment; filename="kp_request.xlsx"'})

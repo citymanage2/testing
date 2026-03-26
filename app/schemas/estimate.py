@@ -16,6 +16,7 @@ class EstimateItemSchema(BaseModel):
     is_analogue: bool
     is_optimized: bool
     source_url: Optional[str] = None
+    comment: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -25,7 +26,8 @@ class EstimateItemSchema(BaseModel):
             id=str(obj.id), position=obj.position, section=obj.section,
             type=obj.type, name=obj.name, unit=obj.unit, quantity=obj.quantity,
             price_work=obj.work_price, price_material=obj.mat_price, total=obj.total,
-            is_analogue=obj.is_analogue, is_optimized=obj.is_optimized, source_url=obj.source_url,
+            is_analogue=obj.is_analogue, is_optimized=obj.is_optimized,
+            source_url=obj.source_url, comment=obj.comment,
         )
 
 
@@ -37,6 +39,12 @@ class EstimateItemUpdate(BaseModel):
     work_price: Optional[float] = None
     mat_price: Optional[float] = None
     source_url: Optional[str] = None
+    comment: Optional[str] = None
+
+
+class KPRequestCreate(BaseModel):
+    item_ids: list[str] = []  # empty = all materials
+    comment: str = ""
 
 
 class EstimateItemsResponse(BaseModel):

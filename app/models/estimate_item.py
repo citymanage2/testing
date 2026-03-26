@@ -21,4 +21,5 @@ class EstimateItem(Base):
     is_analogue: Mapped[bool] = mapped_column(default=False)
     is_optimized: Mapped[bool] = mapped_column(default=False)
     source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     original_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)

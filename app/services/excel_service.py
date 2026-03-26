@@ -54,6 +54,41 @@ def build_estimate_excel(items, filter_type: str = "all") -> bytes:
     return buf.getvalue()
 
 
+def build_kp_excel(items, comment: str = "") -> bytes:
+    """Build commercial proposal request Excel for sending to suppliers."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Запрос КП"
+
+    if comment:
+        ws.merge_cells("A1:H1")
+        c = ws.cell(row=1, column=1, value=f"Комментарий: {comment}")
+        c.font = Font(italic=True, color="555555")
+        ws.row_dimensions[1].height = 30
+        start_row = 3
+    else:
+        start_row = 2
+
+    headers = ["№", "Наименование", "Ед.изм.", "Кол-во", "Комментарий", "Цена поставщика", "Срок поставки", "Поставщик"]
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=start_row - 1, column=col, value=h)
+        cell.font = _BOLD
+        cell.fill = PatternFill(fill_type="solid", fgColor="FFF9C4")
+        cell.alignment = Alignment(horizontal="center", wrap_text=True)
+
+    for i, item in enumerate(items, 1):
+        row = [i, item.name, item.unit, item.quantity, getattr(item, "comment", "") or "", "", "", ""]
+        ws.append(row)
+
+    widths = [5, 50, 10, 10, 30, 16, 16, 25]
+    for col, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(col)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def parse_estimate_excel(data: bytes) -> list[dict]:
     """Parse uploaded Excel and return list of item dicts."""
     wb = load_workbook(io.BytesIO(data), read_only=True)
