@@ -53,6 +53,7 @@ class OptimizationService:
                 item.work_price = float(result.get("work_price", item.work_price))
                 item.mat_price = float(result.get("mat_price", item.mat_price))
                 item.total = (item.work_price + item.mat_price) * item.quantity
+                item.is_optimized = True
             except Exception:
                 pass
 

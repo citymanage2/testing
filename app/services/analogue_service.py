@@ -12,23 +12,44 @@ class AnalogueService:
         if not item:
             return []
 
-        system = f"Ты эксперт по строительным материалам в регионе {settings.search_city}."
-        prompt = f"""Найди 3 аналога для: {item.name}, ед: {item.unit}, текущая цена: {item.mat_price or item.work_price} руб.
-Верни JSON массив:
+        system = (
+            f"Ты эксперт по строительным материалам и работам в России, регион: {settings.search_city}. "
+            "Ты хорошо знаешь российских поставщиков: Леруа Мерлен, Петрович, OBI, Максидом, СтройДепо, ВсеИнструменты. "
+            "Давай конкретные, реально существующие аналоги с реальными ценами на 2024-2025 год."
+        )
+        item_type = item.type
+        current_price = item.mat_price if item_type == "Материал" else item.work_price
+        prompt = f"""Позиция сметы:
+Тип: {item_type}
+Наименование: {item.name}
+Единица: {item.unit}
+Текущая цена: {current_price:.2f} руб/{item.unit}
+Раздел: {item.section}
+
+Найди 3 реальных аналога дешевле. Для каждого укажи:
+- Конкретное наименование с маркой/артикулом
+- Поставщика (реальный российский)
+- Реальную цену за {item.unit}
+- Ссылку на сайт поставщика (если знаешь точную — укажи, иначе главную страницу поставщика)
+- Процент экономии
+
+Верни строго JSON массив (без пояснений):
 [
   {{
     "id": "1",
-    "name": "...",
-    "price": 0,
-    "unit": "...",
-    "supplier": "...",
+    "name": "Конкретное название материала/работы",
+    "price": 0.0,
+    "unit": "{item.unit}",
+    "supplier": "Название поставщика",
     "economy_pct": 0,
-    "source_url": null
+    "source_url": "https://..."
   }}
 ]"""
         try:
             result = await claude_service.complete_json(system, [{"role": "user", "content": prompt}])
-            return result if isinstance(result, list) else result.get("items", [])
+            items = result if isinstance(result, list) else result.get("items", [])
+            # Filter out items not cheaper
+            return [i for i in items if float(i.get("price", 999999)) < current_price * 1.05] or items
         except Exception:
             return []
 
@@ -39,10 +60,10 @@ class AnalogueService:
 
         await snapshot_service.save_snapshot(db, task_id, "analogue", f"Применён аналог для {item.name}")
 
-        # Save original
         item.original_data = {
             "name": item.name, "work_price": item.work_price,
             "mat_price": item.mat_price, "total": item.total,
+            "source_url": item.source_url,
         }
 
         price = float(analogue.get("price", 0))
@@ -52,6 +73,7 @@ class AnalogueService:
             item.mat_price = price
         item.total = (item.work_price + item.mat_price) * item.quantity
         item.is_analogue = True
+        item.source_url = analogue.get("source_url") or item.source_url
         await db.commit()
 
     async def revert_analogue(self, db: AsyncSession, task_id: str, item_id: str):
@@ -65,6 +87,7 @@ class AnalogueService:
         item.work_price = orig.get("work_price", item.work_price)
         item.mat_price = orig.get("mat_price", item.mat_price)
         item.total = orig.get("total", item.total)
+        item.source_url = orig.get("source_url")
         item.is_analogue = False
         item.original_data = None
         await db.commit()

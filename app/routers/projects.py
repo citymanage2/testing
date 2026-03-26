@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.auth import get_current_user, CurrentUser
@@ -11,7 +12,11 @@ from app.models.estimate_item import EstimateItem
 from app.models.task_version import TaskVersion
 from app.config import settings
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectDetailResponse, TaskInProject
-from app.schemas.estimate import EstimateItemsResponse, EstimateItemSchema, EstimateStatusUpdate, VersionResponse, OptimizeExecuteRequest, ApplyAnalogueRequest
+from app.schemas.estimate import (
+    EstimateItemsResponse, EstimateItemSchema, EstimateItemUpdate, EstimateStatusUpdate,
+    VersionResponse, OptimizeExecuteRequest, ApplyAnalogueRequest,
+    MoveTaskRequest, ProjectTotals, PairCheckResult,
+)
 
 router = APIRouter()
 
@@ -146,3 +151,107 @@ async def revert_analogue(task_id: str, item_id: str, current_user: CurrentUser,
     from app.services.analogue_service import analogue_service
     await analogue_service.revert_analogue(db, task_id, item_id)
     return {"ok": True}
+
+
+@router.patch("/estimates/{task_id}/items/{item_id}", response_model=EstimateItemSchema)
+async def update_item(task_id: str, item_id: str, body: EstimateItemUpdate, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    item = await db.get(EstimateItem, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if body.section is not None: item.section = body.section
+    if body.name is not None: item.name = body.name
+    if body.unit is not None: item.unit = body.unit
+    if body.quantity is not None: item.quantity = body.quantity
+    if body.work_price is not None: item.work_price = body.work_price
+    if body.mat_price is not None: item.mat_price = body.mat_price
+    if body.source_url is not None: item.source_url = body.source_url
+    item.total = (item.work_price + item.mat_price) * item.quantity
+    await db.commit()
+    return EstimateItemSchema.model_validate(item)
+
+
+@router.post("/estimates/{task_id}/move")
+async def move_task(task_id: str, body: MoveTaskRequest, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    task.project_id = body.project_id if body.project_id else None
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/{project_id}/totals", response_model=ProjectTotals)
+async def project_totals(project_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    tasks = (await db.execute(select(Task).where(Task.project_id == project_id))).scalars().all()
+    task_ids = [t.id for t in tasks]
+    if not task_ids:
+        return ProjectTotals(total_work=0, total_mat=0, total=0, total_vat=0, tasks_count=0)
+    items = (await db.execute(select(EstimateItem).where(EstimateItem.task_id.in_(task_ids)))).scalars().all()
+    tw = sum(i.work_price * i.quantity for i in items)
+    tm = sum(i.mat_price * i.quantity for i in items)
+    total = tw + tm
+    return ProjectTotals(total_work=tw, total_mat=tm, total=total, total_vat=total * settings.vat_rate / 100, tasks_count=len(task_ids))
+
+
+@router.get("/estimates/{task_id}/export")
+async def export_estimate(task_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db), filter_type: str = Query("all")):
+    from app.services.excel_service import build_estimate_excel
+    items = (await db.execute(select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.position))).scalars().all()
+    data = build_estimate_excel(items, filter_type)
+    names = {"works": "works", "materials": "materials"}
+    fname = f"smeta_{names.get(filter_type, 'all')}.xlsx"
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+@router.post("/{project_id}/import-estimate")
+async def import_estimate(*, project_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db), file: UploadFile = File(...)):
+    if not file.filename or not file.filename.endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Only .xlsx files allowed")
+    data = await file.read()
+    from app.services.excel_service import parse_estimate_excel
+    rows = parse_estimate_excel(data)
+    if not rows:
+        raise HTTPException(status_code=400, detail="No items found in file")
+    task = Task(
+        id=str(uuid.uuid4()), task_type="IMPORT_EXCEL", user_id=current_user.id,
+        project_id=project_id, status="completed", estimate_status="calculated",
+        user_prompt=f"Импорт из {file.filename}", chat_history=[],
+    )
+    db.add(task)
+    await db.flush()
+    for row in rows:
+        wp = float(row.get("work_price", 0))
+        mp = float(row.get("mat_price", 0))
+        q = float(row.get("quantity", 1))
+        db.add(EstimateItem(
+            id=str(uuid.uuid4()), task_id=task.id, position=row["position"],
+            section=row.get("section", ""), type=row.get("type", "Работа"),
+            name=row["name"], unit=row.get("unit", "шт"),
+            quantity=q, work_price=wp, mat_price=mp, total=(wp + mp) * q,
+            source_url=row.get("source_url"),
+        ))
+    await db.commit()
+    return {"task_id": task.id}
+
+
+@router.get("/estimates/{task_id}/check-pairs", response_model=PairCheckResult)
+async def check_pairs(task_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    items = (await db.execute(select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.position))).scalars().all()
+    works = {i.name.lower().strip() for i in items if i.type == "Работа"}
+    materials = {i.name.lower().strip() for i in items if i.type == "Материал"}
+    # Find materials with no similar work name and vice versa (simple keyword match)
+    mat_without = []
+    for i in items:
+        if i.type != "Материал": continue
+        words = set(i.name.lower().split())
+        if not any(any(w in wname for w in words if len(w) > 3) for wname in works):
+            mat_without.append(i.name)
+    work_without = []
+    for i in items:
+        if i.type != "Работа": continue
+        words = set(i.name.lower().split())
+        if not any(any(w in mname for w in words if len(w) > 3) for mname in materials):
+            work_without.append(i.name)
+    ok = not mat_without and not work_without
+    summary = "Все позиции имеют пары." if ok else f"Материалов без работ: {len(mat_without)}, работ без материалов: {len(work_without)}"
+    return PairCheckResult(ok=ok, materials_without_work=mat_without[:20], works_without_material=work_without[:20], summary=summary)

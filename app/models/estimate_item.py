@@ -19,4 +19,6 @@ class EstimateItem(Base):
     mat_price: Mapped[float] = mapped_column(default=0.0)
     total: Mapped[float] = mapped_column(default=0.0)
     is_analogue: Mapped[bool] = mapped_column(default=False)
+    is_optimized: Mapped[bool] = mapped_column(default=False)
+    source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     original_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
