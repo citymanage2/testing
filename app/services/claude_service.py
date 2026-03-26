@@ -3,6 +3,7 @@ Thin wrapper around the Anthropic Claude API.
 All AI calls go through here so the rest of the codebase stays clean.
 """
 import json
+from json_repair import repair_json
 from anthropic import AsyncAnthropic
 from app.config import settings
 
@@ -37,4 +38,7 @@ async def complete_json(system: str, messages: list[dict], max_tokens: int = MAX
     if end == -1:
         raise json.JSONDecodeError("Unterminated JSON", text, len(text))
     text = text[:end + 1]
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return json.loads(repair_json(text))
