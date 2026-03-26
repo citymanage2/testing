@@ -258,7 +258,7 @@ function TasksTab() {
                     </td>
                   </tr>
                 ))
-              )}
+              }
             </tbody>
           </table>
 
