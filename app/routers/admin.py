@@ -15,6 +15,7 @@ router = APIRouter()
 
 @router.get("/tasks", response_model=TasksPage)
 async def list_tasks(
+    *,
     status: str | None = Query(None),
     task_type: str | None = Query(None),
     date_from: datetime | None = Query(None),
