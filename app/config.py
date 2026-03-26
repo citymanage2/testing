@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     max_file_size_mb: int = 50
     search_city: str = "Екатеринбург"
     vat_rate: float = 20.0
+    cors_origins: str = "https://testing-frontend-52jt.onrender.com"
 
     class Config:
         env_file = ".env"

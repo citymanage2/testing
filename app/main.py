@@ -17,9 +17,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Smeta AI", lifespan=lifespan)
 
+_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://testing-frontend-52jt.onrender.com"],
+    allow_origins=_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
