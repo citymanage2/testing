@@ -9,7 +9,7 @@ from app.models.task import Task, TASK_TYPES, ALLOWED_MIME_TYPES
 from app.models.task_input_file import TaskInputFile
 from app.models.task_result import TaskResult
 from app.config import settings
-from app.schemas.task import TaskStatusResponse, MessageRequest, TaskResultFile
+from app.schemas.task import TaskStatusResponse, MessageRequest, TaskResultFile, TaskNameUpdate, TaskDocTypeUpdate
 
 router = APIRouter()
 
@@ -22,7 +22,7 @@ async def list_tasks(current_user: CurrentUser, db: AsyncSession = Depends(get_d
     q = q.order_by(Task.created_at.desc()).limit(100)
     tasks = (await db.execute(q)).scalars().all()
     return [TaskStatusResponse(
-        id=t.id, task_type=t.task_type, status=t.status,
+        id=t.id, task_type=t.task_type, status=t.status, name=t.name, doc_type=t.doc_type,
         progress_message=t.progress_message, error_message=t.error_message,
         estimate_status=t.estimate_status, created_at=t.created_at, updated_at=t.updated_at,
     ) for t in tasks]
@@ -86,6 +86,8 @@ async def get_status(
         id=task.id,
         task_type=task.task_type,
         status=task.status,
+        name=task.name,
+        doc_type=task.doc_type,
         progress_message=task.progress_message,
         error_message=task.error_message,
         estimate_status=task.estimate_status,
@@ -126,6 +128,51 @@ async def send_message(
     await db.commit()
     from app.services.task_processor import task_processor
     asyncio.create_task(task_processor.process(task.id))
+    return {"ok": True}
+
+
+@router.delete("/{task_id}", status_code=204)
+async def delete_task(
+    task_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    await db.delete(task)
+    await db.commit()
+
+
+@router.patch("/{task_id}/name")
+async def update_task_name(
+    task_id: str,
+    body: TaskNameUpdate,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    task.name = body.name
+    await db.commit()
+    return {"ok": True}
+
+
+@router.patch("/{task_id}/doc-type")
+async def update_task_doc_type(
+    task_id: str,
+    body: TaskDocTypeUpdate,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    task.doc_type = body.doc_type
+    await db.commit()
     return {"ok": True}
 
 

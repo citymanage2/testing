@@ -89,6 +89,79 @@ def build_kp_excel(items, comment: str = "") -> bytes:
     return buf.getvalue()
 
 
+def build_separation_sheet_excel(items, title: str = "Разделительная ведомость") -> bytes:
+    """Build separation sheet Excel: items grouped by section."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Ведомость"
+
+    # Title row
+    ws.merge_cells("A1:J1")
+    tc = ws.cell(row=1, column=1, value=title)
+    tc.font = Font(bold=True, size=13)
+    tc.alignment = Alignment(horizontal="center")
+    ws.row_dimensions[1].height = 24
+
+    # Collect sections
+    from itertools import groupby
+    sorted_items = sorted(items, key=lambda i: (i.section or ""))
+    row = 2
+    grand_total = 0.0
+
+    for section, group in groupby(sorted_items, key=lambda i: i.section or ""):
+        grp = list(group)
+        # Section header
+        ws.merge_cells(f"A{row}:J{row}")
+        sh = ws.cell(row=row, column=1, value=section or "Без раздела")
+        sh.font = Font(bold=True)
+        sh.fill = _HEADER_FILL
+        sh.alignment = Alignment(horizontal="left")
+        row += 1
+
+        # Column headers
+        for col, h in enumerate(["№", "Тип", "Наименование", "Ед.", "Кол-во", "Цена работ", "Цена мат.", "Стоимость работ", "Стоимость мат.", "Итого"], 1):
+            c = ws.cell(row=row, column=col, value=h)
+            c.font = _BOLD
+            c.fill = PatternFill(fill_type="solid", fgColor="EEF2F9")
+            c.alignment = Alignment(horizontal="center", wrap_text=True)
+        row += 1
+
+        sec_total = 0.0
+        for j, item in enumerate(grp, 1):
+            wp = item.work_price or 0
+            mp = item.mat_price or 0
+            qty = item.quantity or 0
+            cost_w = wp * qty
+            cost_m = mp * qty
+            total = cost_w + cost_m
+            sec_total += total
+            for col, val in enumerate([j, item.type, item.name, item.unit, qty, wp, mp, cost_w, cost_m, total], 1):
+                ws.cell(row=row, column=col, value=val)
+            row += 1
+
+        # Section total
+        for col in range(1, 11):
+            ws.cell(row=row, column=col).fill = _HEADER_FILL
+        ws.cell(row=row, column=3, value=f"Итого по разделу").font = _BOLD
+        ws.cell(row=row, column=10, value=sec_total).font = _BOLD
+        grand_total += sec_total
+        row += 2  # blank line between sections
+
+    # Grand total
+    for col in range(1, 11):
+        ws.cell(row=row, column=col).fill = PatternFill(fill_type="solid", fgColor="C5CAE9")
+    ws.cell(row=row, column=3, value="ИТОГО").font = Font(bold=True, size=11)
+    ws.cell(row=row, column=10, value=grand_total).font = Font(bold=True, size=11)
+
+    widths = [5, 12, 50, 8, 8, 14, 14, 16, 16, 16]
+    for col, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(col)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def parse_estimate_excel(data: bytes) -> list[dict]:
     """Parse uploaded Excel and return list of item dicts."""
     wb = load_workbook(io.BytesIO(data), read_only=True)

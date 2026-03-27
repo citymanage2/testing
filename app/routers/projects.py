@@ -16,6 +16,7 @@ from app.schemas.estimate import (
     EstimateItemsResponse, EstimateItemSchema, EstimateItemUpdate, EstimateStatusUpdate,
     VersionResponse, OptimizeExecuteRequest, ApplyAnalogueRequest,
     MoveTaskRequest, ProjectTotals, PairCheckResult, KPRequestCreate,
+    TaskExtras, SeparationSheetRequest, EstimateItemCreate,
 )
 
 router = APIRouter()
@@ -183,15 +184,19 @@ async def move_task(task_id: str, body: MoveTaskRequest, current_user: CurrentUs
 
 @router.get("/{project_id}/totals", response_model=ProjectTotals)
 async def project_totals(project_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    # Only count SMETA tasks for totals (not TZ, project docs, etc.)
+    smeta_types = ("SMETA_FROM_LIST", "SMETA_FROM_TZ", "SMETA_FROM_TZ_PROJECT", "SMETA_FROM_PROJECT",
+                   "SMETA_FROM_EDC_PROJECT", "SMETA_FROM_GRAND_PROJECT", "SCAN_TO_EXCEL", "IMPORT_EXCEL")
     tasks = (await db.execute(select(Task).where(Task.project_id == project_id))).scalars().all()
-    task_ids = [t.id for t in tasks]
+    smeta_tasks = [t for t in tasks if t.task_type in smeta_types]
+    task_ids = [t.id for t in smeta_tasks]
     if not task_ids:
-        return ProjectTotals(total_work=0, total_mat=0, total=0, total_vat=0, tasks_count=0)
+        return ProjectTotals(total_work=0, total_mat=0, total=0, total_vat=0, tasks_count=len(smeta_tasks))
     items = (await db.execute(select(EstimateItem).where(EstimateItem.task_id.in_(task_ids)))).scalars().all()
     tw = sum(i.work_price * i.quantity for i in items)
     tm = sum(i.mat_price * i.quantity for i in items)
     total = tw + tm
-    return ProjectTotals(total_work=tw, total_mat=tm, total=total, total_vat=total * settings.vat_rate / 100, tasks_count=len(task_ids))
+    return ProjectTotals(total_work=tw, total_mat=tm, total=total, total_vat=total * settings.vat_rate / 100, tasks_count=len(smeta_tasks))
 
 
 @router.get("/estimates/{task_id}/export")
@@ -270,3 +275,75 @@ async def kp_request(task_id: str, body: KPRequestCreate, current_user: CurrentU
     data = build_kp_excel(items, body.comment)
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": 'attachment; filename="kp_request.xlsx"'})
+
+
+@router.get("/estimates/{task_id}/extras", response_model=TaskExtras)
+async def get_extras(task_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    e = task.extras or {}
+    return TaskExtras(
+        overhead_pct=e.get("overhead_pct", 0.0),
+        overhead_sum=e.get("overhead_sum", 0.0),
+        transport_pct=e.get("transport_pct", 0.0),
+        transport_sum=e.get("transport_sum", 0.0),
+        contingency_pct=e.get("contingency_pct", 0.0),
+        contingency_sum=e.get("contingency_sum", 0.0),
+    )
+
+
+@router.patch("/estimates/{task_id}/extras", response_model=TaskExtras)
+async def update_extras(task_id: str, body: TaskExtras, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    task.extras = body.model_dump()
+    await db.commit()
+    return body
+
+
+@router.post("/estimates/{task_id}/items", response_model=EstimateItemSchema, status_code=201)
+async def add_estimate_item(task_id: str, body: EstimateItemCreate, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    # get next position
+    existing = (await db.execute(select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.position.desc()).limit(1))).scalars().first()
+    position = (existing.position + 1) if existing else 0
+    item = EstimateItem(
+        id=str(uuid.uuid4()), task_id=task_id, position=position,
+        section=body.section, type=body.type, name=body.name, unit=body.unit,
+        quantity=body.quantity, work_price=body.work_price, mat_price=body.mat_price,
+        total=(body.work_price + body.mat_price) * body.quantity,
+    )
+    db.add(item)
+    await db.commit()
+    return EstimateItemSchema.model_validate(item)
+
+
+@router.delete("/estimates/{task_id}/items/{item_id}", status_code=204)
+async def delete_estimate_item(task_id: str, item_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    item = await db.get(EstimateItem, item_id)
+    if not item or item.task_id != task_id:
+        raise HTTPException(status_code=404, detail="Item not found")
+    await db.delete(item)
+    await db.commit()
+
+
+@router.post("/estimates/{task_id}/separation-sheet")
+async def separation_sheet(task_id: str, body: SeparationSheetRequest, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    from app.services.excel_service import build_separation_sheet_excel
+    q = select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.position)
+    all_items = (await db.execute(q)).scalars().all()
+    if body.item_ids:
+        items = [i for i in all_items if i.id in set(body.item_ids)]
+    else:
+        items = list(all_items)
+        if body.sections:
+            items = [i for i in items if (i.section or "") in body.sections]
+    if not body.include_works:
+        items = [i for i in items if i.type != "Работа"]
+    if not body.include_materials:
+        items = [i for i in items if i.type != "Материал"]
+    data = build_separation_sheet_excel(items, body.title)
+    fname = "separation_sheet.xlsx"
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{fname}"'})

@@ -104,3 +104,30 @@ class PairCheckResult(BaseModel):
     materials_without_work: list[str]
     works_without_material: list[str]
     summary: str
+
+
+class TaskExtras(BaseModel):
+    overhead_pct: float = 0.0
+    overhead_sum: float = 0.0
+    transport_pct: float = 0.0
+    transport_sum: float = 0.0
+    contingency_pct: float = 0.0
+    contingency_sum: float = 0.0
+
+
+class SeparationSheetRequest(BaseModel):
+    item_ids: list[str] = []   # empty = use sections filter
+    sections: list[str] = []   # section names, empty = all
+    include_works: bool = True
+    include_materials: bool = True
+    title: str = "Разделительная ведомость"
+
+
+class EstimateItemCreate(BaseModel):
+    section: str = ""
+    type: str = "Работа"
+    name: str = ""
+    unit: str = "шт"
+    quantity: float = 1.0
+    work_price: float = 0.0
+    mat_price: float = 0.0

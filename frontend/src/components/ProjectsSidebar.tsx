@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
 
 interface Project { id: string; name: string; }
-interface TaskRef { id: string; task_type: string; status: string; estimate_status?: string; }
+interface TaskRef { id: string; task_type: string; status: string; estimate_status?: string; name?: string; doc_type?: string; }
 interface ProjectDetail extends Project { tasks: TaskRef[]; }
 interface Totals { total_work: number; total_mat: number; total: number; total_vat: number; tasks_count: number; }
 
@@ -101,7 +101,7 @@ export default function ProjectsSidebar() {
                   title="Перетащите в проект"
                 >
                   <span style={{ color: '#bbb', fontSize: 10 }}>⠿</span>
-                  <span style={{ flex: 1 }}>{TYPE_LABELS[t.task_type] || t.task_type}</span>
+                  <span style={{ flex: 1 }}>{t.name || TYPE_LABELS[t.task_type] || t.task_type}</span>
                   <span style={{ fontSize: 10, color: t.status === 'completed' ? '#4caf50' : t.status === 'failed' ? '#f44336' : '#ff9800' }}>●</span>
                 </div>
               ))}
@@ -139,9 +139,15 @@ export default function ProjectsSidebar() {
                   {!detail || detail.tasks.length === 0
                     ? <p style={{ color: '#aaa', fontSize: 12, margin: '4px 8px' }}>Нет смет</p>
                     : detail.tasks.map(t => (
-                      <div key={t.id} onClick={() => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`)}
-                        style={{ padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12, color: '#1565c0', marginBottom: 2 }}>
-                        {t.task_type} <span style={{ color: '#999' }}>({t.status})</span>
+                      <div key={t.id} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 12, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span onClick={() => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`)}
+                          style={{ flex: 1, cursor: 'pointer', color: '#1565c0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {t.name || TYPE_LABELS[t.task_type] || t.task_type}
+                          {t.doc_type && <span style={{ marginLeft: 4, fontSize: 10, color: '#888' }}>[{t.doc_type}]</span>}
+                        </span>
+                        <span style={{ fontSize: 10, color: t.status === 'completed' ? '#4caf50' : t.status === 'failed' ? '#f44336' : '#ff9800' }}>●</span>
+                        <button onClick={async (e) => { e.stopPropagation(); if (confirm('Удалить смету?')) { await client.delete(`/tasks/${t.id}`); refreshDetail(p.id); } }}
+                          style={{ padding: '1px 5px', fontSize: 10, background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 3, cursor: 'pointer' }}>✕</button>
                       </div>
                     ))}
                 </>

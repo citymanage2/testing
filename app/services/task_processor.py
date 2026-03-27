@@ -59,11 +59,12 @@ ESTIMATE_JSON_PROMPT = """
       "quantity": 0,
       "work_price": 0,
       "mat_price": 0,
-      "source_url": "https://... (для материалов — URL страницы товара или сайта поставщика, для работ — null)"
+      "source_url": "https://... (для материалов — URL страницы товара или сайта поставщика, для работ — null)",
+      "comment": "Логика формирования цены: для работ — обоснование ставки (норма, сложность, регион); для материалов — обоснование цены (источник, аналог, рыночная стоимость)"
     }
   ]
 }
-Важно: цены должны быть реальными рыночными. Для материалов укажи source_url — ссылку на реального российского поставщика.
+Важно: цены должны быть реальными рыночными. Для материалов укажи source_url. Поле comment ОБЯЗАТЕЛЬНО заполни для каждой позиции — укажи логику и источник формирования цены.
 """
 
 
@@ -196,6 +197,7 @@ class TaskProcessor:
 
             total = (work_price + mat_price) * quantity
             source_url = raw.get("source_url") or None
+            comment = raw.get("comment") or None
             db.add(EstimateItem(
                 id=str(uuid.uuid4()),
                 task_id=task.id,
@@ -209,6 +211,7 @@ class TaskProcessor:
                 mat_price=mat_price,
                 total=total,
                 source_url=source_url,
+                comment=comment,
             ))
 
         await db.flush()
