@@ -14,13 +14,19 @@ MAX_TOKENS = 16000
 
 
 async def complete(system: str, messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
-    response = await client.messages.create(
-        model=MODEL,
-        max_tokens=max_tokens,
-        system=system,
-        messages=messages,
-    )
-    return response.content[0].text
+    import asyncio
+    from anthropic import APIStatusError
+    for attempt in range(5):
+        try:
+            response = await client.messages.create(
+                model=MODEL, max_tokens=max_tokens, system=system, messages=messages,
+            )
+            return response.content[0].text
+        except APIStatusError as e:
+            if e.status_code == 529 and attempt < 4:
+                await asyncio.sleep(2 ** attempt)
+                continue
+            raise
 
 
 async def complete_json(system: str, messages: list[dict], max_tokens: int = MAX_TOKENS) -> dict | list:
