@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     max_file_size_mb: int = 50
     vat_rate: float = 20.0
     search_city: str = "Екатеринбург"
+    lemana_api_key: str = ""
+    lemana_region_id: int = 34  # 34=Москва, 506=Санкт-Петербург
 
     class Config:
         env_file = ".env"
