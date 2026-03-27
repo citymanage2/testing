@@ -16,4 +16,3 @@ pydantic>=2.0
 pydantic-settings
 pypdf>=4.0
 json-repair
-httpx

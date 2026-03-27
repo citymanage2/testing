@@ -270,13 +270,3 @@ async def kp_request(task_id: str, body: KPRequestCreate, current_user: CurrentU
     data = build_kp_excel(items, body.comment)
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": 'attachment; filename="kp_request.xlsx"'})
-
-
-@router.get("/estimates/{task_id}/items/{item_id}/lemana-search")
-async def lemana_search(task_id: str, item_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
-    """Search Lemana Pro for analogues of the given estimate item."""
-    item = await db.get(EstimateItem, item_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    from app.services.lemana_service import search_lemana
-    return await search_lemana(item.name)

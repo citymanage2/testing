@@ -14,7 +14,6 @@ interface Item {
 interface EstimateData { items: Item[]; vat_rate: number; total_work: number; total_mat: number; total: number; total_vat: number; estimate_status: string; }
 interface Project { id: string; name: string; }
 interface PairResult { ok: boolean; materials_without_work: string[]; works_without_material: string[]; summary: string; }
-interface LemanaResult { name?: string; price?: number; unit?: string; url?: string; sku?: string; source?: string; error?: string; }
 
 export default function EstimateView() {
   const { id } = useParams<{ id: string }>();
@@ -31,9 +30,6 @@ export default function EstimateView() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showMove, setShowMove] = useState(false);
   const [showKP, setShowKP] = useState(false);
-  const [lemanaItemId, setLemanaItemId] = useState<string | null>(null);
-  const [lemanaResults, setLemanaResults] = useState<LemanaResult[]>([]);
-  const [lemanaLoading, setLemanaLoading] = useState(false);
   const [kpSelected, setKpSelected] = useState<Set<string>>(new Set());
   const [kpComment, setKpComment] = useState('');
   const importRef = useRef<HTMLInputElement>(null);
@@ -111,27 +107,6 @@ export default function EstimateView() {
     const a = document.createElement('a'); a.href = url; a.download = 'kp_request.xlsx'; a.click();
     URL.revokeObjectURL(url);
     setShowKP(false);
-  }
-
-  async function openLemana(itemId: string) {
-    setLemanaItemId(itemId);
-    setLemanaResults([]);
-    setLemanaLoading(true);
-    try {
-      const res = await client.get<LemanaResult[]>(`/projects/estimates/${id}/items/${itemId}/lemana-search`);
-      setLemanaResults(res.data);
-    } catch { setLemanaResults([{ error: 'Ошибка запроса' }]); }
-    finally { setLemanaLoading(false); }
-  }
-
-  async function applyLemanaPrice(item: Item, result: LemanaResult) {
-    if (!result.price) return;
-    await client.patch(`/projects/estimates/${id}/items/${item.id}`, {
-      mat_price: result.price,
-      source_url: result.url || '',
-    });
-    setLemanaItemId(null);
-    load();
   }
 
   async function moveToProject(projectId: string) {
@@ -219,11 +194,10 @@ export default function EstimateView() {
                     )}
                   </td>
                   <td style={{ ...td, minWidth: 120 }}>{editInput(item, 'comment')}</td>
-                  <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                    {item.type === 'Материал' && (<>
-                      <button onClick={() => setAnalogueItemId(item.id)} style={{ padding: '2px 7px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11, marginRight: 4 }}>Аналоги</button>
-                      <button onClick={() => openLemana(item.id)} style={{ padding: '2px 7px', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Леман Про</button>
-                    </>)}
+                  <td style={td}>
+                    {item.type === 'Материал' && (
+                      <button onClick={() => setAnalogueItemId(item.id)} style={{ padding: '2px 8px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Аналоги</button>
+                    )}
                   </td>
                 </tr>
               );
@@ -273,43 +247,6 @@ export default function EstimateView() {
               <button key={p.id} onClick={() => moveToProject(p.id)} style={{ display: 'block', width: '100%', padding: '8px 12px', marginBottom: 8, border: '1px solid #ccc', borderRadius: 4, background: '#fff', cursor: 'pointer', textAlign: 'left', fontSize: 14 }}>{p.name}</button>
             ))}
             <button onClick={() => setShowMove(false)} style={{ marginTop: 8, padding: '6px 16px', border: 'none', borderRadius: 4, background: '#eee', cursor: 'pointer' }}>Отмена</button>
-          </div>
-        </div>
-      )}
-
-      {/* Lemana Pro modal */}
-      {lemanaItemId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#fff', borderRadius: 8, padding: 24, width: '90%', maxWidth: 640, maxHeight: '80vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <h3 style={{ margin: 0 }}>🟢 Леман Про</h3>
-              <span style={{ fontSize: 12, color: '#888' }}>{data?.items.find(i => i.id === lemanaItemId)?.name}</span>
-              <button onClick={() => setLemanaItemId(null)} style={{ marginLeft: 'auto', border: 'none', background: 'none', fontSize: 18, cursor: 'pointer' }}>✕</button>
-            </div>
-            {lemanaLoading && <p style={{ color: '#888', textAlign: 'center' }}>Поиск на Леман Про...</p>}
-            {!lemanaLoading && lemanaResults.length === 0 && <p style={{ color: '#888' }}>Нет результатов</p>}
-            {!lemanaLoading && lemanaResults.map((r, i) => (
-              r.error
-                ? <div key={i} style={{ padding: 12, background: '#fff3e0', borderRadius: 6, color: '#e65100', fontSize: 13 }}>⚠️ {r.error}</div>
-                : <div key={i} style={{ padding: 12, border: '1px solid #e0e0e0', borderRadius: 6, marginBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{r.name}</div>
-                        <div style={{ fontSize: 13, color: '#2e7d32', fontWeight: 700 }}>
-                          {r.price ? `${r.price.toLocaleString('ru-RU')} ₽ / ${r.unit || 'шт'}` : 'Цена не указана'}
-                        </div>
-                        {r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#1565c0' }}>🔗 Открыть на сайте</a>}
-                        {r.sku && <span style={{ fontSize: 11, color: '#999', marginLeft: 8 }}>Арт. {r.sku}</span>}
-                      </div>
-                      {r.price && r.price > 0 && (
-                        <button onClick={() => { const item = data!.items.find(i => i.id === lemanaItemId)!; applyLemanaPrice(item, r); }}
-                          style={{ padding: '6px 12px', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}>
-                          Применить цену
-                        </button>
-                      )}
-                    </div>
-                  </div>
-            ))}
           </div>
         </div>
       )}
