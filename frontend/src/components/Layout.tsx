@@ -11,6 +11,7 @@ export default function Layout() {
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 52, background: '#1565c0', color: '#fff', flexShrink: 0 }}>
         <span style={{ fontSize: 18, fontWeight: 700 }}>СМ Смета</span>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <button onClick={() => navigate('/task/create')} style={{ ...headerBtn, background: '#fff', color: '#1565c0', fontWeight: 700, border: '2px solid #fff' }}>+ Новая задача</button>
           {useAuthStore.getState().role === 'admin' && (
             <button onClick={() => navigate('/admin')} style={headerBtn}>Админ</button>
           )}
