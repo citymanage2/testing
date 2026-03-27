@@ -14,6 +14,21 @@ from app.schemas.task import TaskStatusResponse, MessageRequest, TaskResultFile
 router = APIRouter()
 
 
+@router.get("", response_model=list[TaskStatusResponse])
+async def list_tasks(current_user: CurrentUser, db: AsyncSession = Depends(get_db), no_project: bool = False):
+    q = select(Task).where(Task.user_id == current_user.id)
+    if no_project:
+        q = q.where(Task.project_id.is_(None))
+    q = q.order_by(Task.created_at.desc()).limit(100)
+    tasks = (await db.execute(q)).scalars().all()
+    return [TaskStatusResponse(
+        id=t.id, task_type=t.task_type, status=t.status,
+        progress_message=t.progress_message, error_message=t.error_message,
+        estimate_status=t.estimate_status, created_at=t.created_at, updated_at=t.updated_at,
+    ) for t in tasks]
+
+
+
 @router.post("", status_code=201)
 async def create_task(
     *,

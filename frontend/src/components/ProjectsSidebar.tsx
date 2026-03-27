@@ -9,6 +9,13 @@ interface Totals { total_work: number; total_mat: number; total: number; total_v
 
 function fmt(v: number) { return v.toLocaleString('ru-RU', { maximumFractionDigits: 0 }); }
 
+const TYPE_LABELS: Record<string, string> = {
+  SMETA_FROM_PROJECT: 'Смета из проекта', SMETA_FROM_TZ: 'Смета из ТЗ', SMETA_FROM_LIST: 'Смета из перечня',
+  SMETA_FROM_TZ_PROJECT: 'Смета ТЗ+проект', SMETA_FROM_EDC_PROJECT: 'Смета EDC', SMETA_FROM_GRAND_PROJECT: 'Grand-смета',
+  LIST_FROM_TZ: 'Перечень из ТЗ', LIST_FROM_PROJECT: 'Перечень из проекта', LIST_FROM_TZ_PROJECT: 'Перечень ТЗ+проект',
+  RESEARCH_PROJECT: 'Исследование', SCAN_TO_EXCEL: 'Скан→Excel', COMPARE_PROJECT_SMETA: 'Сравнение', IMPORT_EXCEL: 'Импорт Excel',
+};
+
 export default function ProjectsSidebar() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -16,12 +23,15 @@ export default function ProjectsSidebar() {
   const [totals, setTotals] = useState<Totals | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [dragOver, setDragOver] = useState<string | null>(null);
+  const [noProjectTasks, setNoProjectTasks] = useState<TaskRef[]>([]);
+  const [showNoProject, setShowNoProject] = useState(true);
   const importRef = useRef<HTMLInputElement>(null);
   const [importProjectId, setImportProjectId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   async function load() {
     try { setProjects((await client.get<Project[]>('/projects')).data); } catch { setProjects([]); }
+    try { setNoProjectTasks((await client.get<TaskRef[]>('/tasks?no_project=true')).data); } catch { setNoProjectTasks([]); }
   }
 
   useEffect(() => { load(); }, []);
@@ -32,6 +42,7 @@ export default function ProjectsSidebar() {
     if (!taskId) return;
     try {
       await client.post(`/projects/${projectId}/estimates/${taskId}`);
+      setNoProjectTasks(prev => prev.filter(t => t.id !== taskId));
       if (expanded === projectId) refreshDetail(projectId);
     } catch { /* ignore */ }
   }
@@ -69,6 +80,35 @@ export default function ProjectsSidebar() {
   return (
     <div style={{ padding: '12px 8px' }}>
       <button onClick={async () => { const n = prompt('Название проекта:'); if (n?.trim()) { await client.post('/projects', { name: n.trim() }); load(); } }} style={newProjectBtn}>+ Новый проект</button>
+
+      {/* No-project section */}
+      <div style={{ marginBottom: 8 }}>
+        <div onClick={() => setShowNoProject(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 4, cursor: 'pointer', background: '#fff3e0', fontSize: 13, fontWeight: 600 }}>
+          <span style={{ fontSize: 10, color: '#e65100' }}>{showNoProject ? '▼' : '▶'}</span>
+          <span style={{ flex: 1, color: '#e65100' }}>Без проекта</span>
+          <span style={{ fontSize: 11, color: '#e65100', background: '#ffe0b2', borderRadius: 10, padding: '1px 7px' }}>{noProjectTasks.length}</span>
+        </div>
+        {showNoProject && (
+          <div style={{ paddingLeft: 12 }}>
+            {noProjectTasks.length === 0
+              ? <p style={{ color: '#aaa', fontSize: 12, margin: '4px 8px' }}>Пусто</p>
+              : noProjectTasks.map(t => (
+                <div key={t.id}
+                  draggable
+                  onDragStart={e => e.dataTransfer.setData('text/plain', t.id)}
+                  onClick={() => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`)}
+                  style={{ padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12, color: '#1565c0', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}
+                  title="Перетащите в проект"
+                >
+                  <span style={{ color: '#bbb', fontSize: 10 }}>⠿</span>
+                  <span style={{ flex: 1 }}>{TYPE_LABELS[t.task_type] || t.task_type}</span>
+                  <span style={{ fontSize: 10, color: t.status === 'completed' ? '#4caf50' : t.status === 'failed' ? '#f44336' : '#ff9800' }}>●</span>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+
       {projects.length === 0 && <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center' }}>Нет проектов</p>}
       {projects.map(p => (
         <div key={p.id} style={{ marginBottom: 4 }}>
