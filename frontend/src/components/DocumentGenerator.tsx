@@ -1,27 +1,32 @@
 import { useEffect, useState } from 'react';
 import client from '../api/client';
+import { C, btnPrimary, btnGhost, INPUT, LBL, CARD } from '../ui';
 
 interface Contractor { id: string; kind: string; name: string; }
 interface DocMeta { id: string; doc_kind: string; file_name: string; created_at: string; params?: Record<string, unknown>; }
+interface Acceptance { id: string; act_number: string; contractor_name?: string; period_start?: string; period_end?: string; status: string; }
 
 const DOC_KIND_LABELS: Record<string, string> = { estimate_xlsx: 'Смета Excel', ks2: 'КС-2', ks3: 'КС-3' };
+const TAB_LABELS: Record<string, string> = { estimate: '⬇ Смета', ks2: 'КС-2', ks3: 'КС-3' };
 
 export default function DocumentGenerator({ taskId }: { taskId: string }) {
   const [tab, setTab] = useState<'estimate' | 'ks2' | 'ks3'>('estimate');
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [acceptances, setAcceptances] = useState<Acceptance[]>([]);
   const [history, setHistory] = useState<DocMeta[]>([]);
   const [generating, setGenerating] = useState(false);
 
-  // shared KS fields
   const [contractorId, setContractorId] = useState('');
   const [periodStart, setPeriodStart] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10));
   const [periodEnd, setPeriodEnd] = useState(new Date().toISOString().slice(0, 10));
   const [actNumber, setActNumber] = useState('1');
   const [estimateTitle, setEstimateTitle] = useState('');
   const [ks2Amount, setKs2Amount] = useState('');
+  const [acceptanceId, setAcceptanceId] = useState('');
 
   useEffect(() => {
     client.get<Contractor[]>('/contractors').then(r => setContractors(r.data)).catch(() => {});
+    client.get<Acceptance[]>(`/projects/estimates/${taskId}/acceptances`).then(r => setAcceptances(r.data)).catch(() => {});
     loadHistory();
   }, [taskId]);
 
@@ -40,7 +45,9 @@ export default function DocumentGenerator({ taskId }: { taskId: string }) {
         body = { title: estimateTitle || undefined, contractor_id: contractorId || undefined };
       } else if (tab === 'ks2') {
         url = `/projects/estimates/${taskId}/documents/ks2`;
-        body = { contractor_id: contractorId || undefined, period_start: periodStart, period_end: periodEnd, act_number: actNumber };
+        body = acceptanceId
+          ? { acceptance_id: acceptanceId, period_start: periodStart, period_end: periodEnd }
+          : { contractor_id: contractorId || undefined, period_start: periodStart, period_end: periodEnd, act_number: actNumber };
       } else {
         url = `/projects/estimates/${taskId}/documents/ks3`;
         body = { contractor_id: contractorId || undefined, period_start: periodStart, period_end: periodEnd, act_number: actNumber, ks2_amount: ks2Amount ? parseFloat(ks2Amount) : undefined };
@@ -51,7 +58,7 @@ export default function DocumentGenerator({ taskId }: { taskId: string }) {
       const match = cd.match(/filename="([^"]+)"/);
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = match ? match[1] : `document.xlsx`;
+      a.download = match ? match[1] : 'document.xlsx';
       a.click();
       URL.revokeObjectURL(blobUrl);
       loadHistory();
@@ -72,12 +79,13 @@ export default function DocumentGenerator({ taskId }: { taskId: string }) {
   const clientContractors = contractors.filter(c => c.kind === 'client');
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: 6, overflow: 'hidden', marginTop: 16 }}>
-      <div style={{ display: 'flex', borderBottom: '1px solid #e0e0e0', background: '#f5f5f5' }}>
-        {([['estimate', '⬇ Смета'], ['ks2', 'КС-2'], ['ks3', 'КС-3']] as const).map(([t, l]) => (
+    <div style={{ ...CARD, overflow: 'hidden', marginTop: 16 }}>
+      {/* Tabs */}
+      <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, background: C.surfaceAlt }}>
+        {(['estimate', 'ks2', 'ks3'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            style={{ padding: '9px 18px', border: 'none', borderBottom: tab === t ? '2px solid #1565c0' : '2px solid transparent', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: tab === t ? 600 : 400, color: tab === t ? '#1565c0' : '#555' }}>
-            {l}
+            style={{ padding: '9px 20px', border: 'none', borderBottom: tab === t ? `2px solid ${C.primary}` : '2px solid transparent', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: tab === t ? 600 : 400, color: tab === t ? C.primary : C.textSec }}>
+            {TAB_LABELS[t]}
           </button>
         ))}
       </div>
@@ -85,11 +93,11 @@ export default function DocumentGenerator({ taskId }: { taskId: string }) {
       <div style={{ padding: '16px 20px' }}>
         {tab === 'estimate' && (
           <div style={{ display: 'grid', gap: 10, maxWidth: 400 }}>
-            <label style={lbl}>Название документа (необязательно)
-              <input value={estimateTitle} onChange={e => setEstimateTitle(e.target.value)} placeholder="Смета на отделочные работы" style={inp} />
+            <label style={LBL}>Название документа (необязательно)
+              <input value={estimateTitle} onChange={e => setEstimateTitle(e.target.value)} placeholder="Смета на отделочные работы" style={{ ...INPUT, marginTop: 4 }} />
             </label>
-            <label style={lbl}>Заказчик (для шапки)
-              <select value={contractorId} onChange={e => setContractorId(e.target.value)} style={inp}>
+            <label style={LBL}>Заказчик (для шапки)
+              <select value={contractorId} onChange={e => setContractorId(e.target.value)} style={{ ...INPUT, marginTop: 4 }}>
                 <option value="">— не указывать —</option>
                 {clientContractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -97,42 +105,71 @@ export default function DocumentGenerator({ taskId }: { taskId: string }) {
           </div>
         )}
 
-        {(tab === 'ks2' || tab === 'ks3') && (
-          <div style={{ display: 'grid', gap: 10, maxWidth: 400 }}>
-            <label style={lbl}>Заказчик *
-              <select value={contractorId} onChange={e => setContractorId(e.target.value)} style={inp}>
+        {tab === 'ks2' && (
+          <div style={{ display: 'grid', gap: 10, maxWidth: 420 }}>
+            {acceptances.length > 0 && (
+              <label style={LBL}>Сформировать на основе акта приёмки
+                <select value={acceptanceId} onChange={e => setAcceptanceId(e.target.value)} style={{ ...INPUT, marginTop: 4 }}>
+                  <option value="">— все позиции сметы —</option>
+                  {acceptances.map(a => (
+                    <option key={a.id} value={a.id}>
+                      Акт №{a.act_number} {a.contractor_name ? `• ${a.contractor_name}` : ''} {a.period_start ? `• ${a.period_start}–${a.period_end}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {!acceptanceId && (
+              <label style={LBL}>Заказчик *
+                <select value={contractorId} onChange={e => setContractorId(e.target.value)} style={{ ...INPUT, marginTop: 4 }}>
+                  <option value="">— выберите заказчика —</option>
+                  {clientContractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </label>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <label style={LBL}>Начало периода<input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={{ ...INPUT, marginTop: 4 }} /></label>
+              <label style={LBL}>Конец периода<input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={{ ...INPUT, marginTop: 4 }} /></label>
+            </div>
+            {!acceptanceId && <label style={LBL}>Номер акта<input value={actNumber} onChange={e => setActNumber(e.target.value)} style={{ ...INPUT, marginTop: 4 }} /></label>}
+          </div>
+        )}
+
+        {tab === 'ks3' && (
+          <div style={{ display: 'grid', gap: 10, maxWidth: 420 }}>
+            <label style={LBL}>Заказчик *
+              <select value={contractorId} onChange={e => setContractorId(e.target.value)} style={{ ...INPUT, marginTop: 4 }}>
                 <option value="">— выберите заказчика —</option>
                 {clientContractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <label style={lbl}>Начало периода<input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={inp} /></label>
-              <label style={lbl}>Конец периода<input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={inp} /></label>
+              <label style={LBL}>Начало периода<input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={{ ...INPUT, marginTop: 4 }} /></label>
+              <label style={LBL}>Конец периода<input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={{ ...INPUT, marginTop: 4 }} /></label>
             </div>
-            <label style={lbl}>Номер акта<input value={actNumber} onChange={e => setActNumber(e.target.value)} style={inp} /></label>
-            {tab === 'ks3' && (
-              <label style={lbl}>Сумма КС-2 (необязательно, по умолчанию — из сметы)
-                <input type="number" value={ks2Amount} onChange={e => setKs2Amount(e.target.value)} placeholder="Автоматически из сметы" style={inp} />
-              </label>
-            )}
+            <label style={LBL}>Номер акта<input value={actNumber} onChange={e => setActNumber(e.target.value)} style={{ ...INPUT, marginTop: 4 }} /></label>
+            <label style={LBL}>Сумма КС-2 (необязательно)
+              <input type="number" value={ks2Amount} onChange={e => setKs2Amount(e.target.value)} placeholder="Автоматически из сметы" style={{ ...INPUT, marginTop: 4 }} />
+            </label>
           </div>
         )}
 
-        <button onClick={generate} disabled={generating} style={{ marginTop: 14, padding: '8px 20px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-          {generating ? 'Формирование...' : '⬇ Сформировать и скачать'}
+        <button onClick={generate} disabled={generating} style={{ ...btnPrimary(), marginTop: 14 }}>
+          {generating ? '⏳ Формирование...' : '⬇ Сформировать и скачать'}
         </button>
       </div>
 
+      {/* History */}
       {history.length > 0 && (
-        <div style={{ borderTop: '1px solid #e0e0e0', padding: '12px 20px' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8 }}>История документов</div>
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: '12px 20px' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: C.textSec, marginBottom: 8 }}>История документов</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {history.slice(0, 10).map(doc => (
-              <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
-                <span style={{ padding: '1px 6px', background: '#e3f2fd', borderRadius: 10, fontSize: 11, color: '#1565c0' }}>{DOC_KIND_LABELS[doc.doc_kind] || doc.doc_kind}</span>
-                <span style={{ fontSize: 12, flex: 1 }}>{doc.file_name}</span>
-                <span style={{ fontSize: 11, color: '#999' }}>{new Date(doc.created_at).toLocaleDateString('ru-RU')}</span>
-                <button onClick={() => reDownload(doc)} style={{ padding: '2px 8px', fontSize: 11, border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', background: '#fff' }}>⬇</button>
+              <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ padding: '1px 7px', background: C.primaryBg, borderRadius: 10, fontSize: 11, color: C.primary }}>{DOC_KIND_LABELS[doc.doc_kind] || doc.doc_kind}</span>
+                <span style={{ fontSize: 12, flex: 1, color: C.text }}>{doc.file_name}</span>
+                <span style={{ fontSize: 11, color: C.textMuted }}>{new Date(doc.created_at).toLocaleDateString('ru-RU')}</span>
+                <button onClick={() => reDownload(doc)} style={btnGhost('sm')}>⬇</button>
               </div>
             ))}
           </div>
@@ -141,6 +178,3 @@ export default function DocumentGenerator({ taskId }: { taskId: string }) {
     </div>
   );
 }
-
-const lbl: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: 13 };
-const inp: React.CSSProperties = { padding: '6px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 13 };

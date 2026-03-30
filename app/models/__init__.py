@@ -13,6 +13,7 @@ from app.models.price_catalog import PriceCatalog
 from app.models.generated_document import GeneratedDocument
 from app.models.project_gallery import ProjectGallery
 from app.models.project_payment import ProjectPayment
+from app.models.work_acceptance import SubcontractorAssignment, WorkAcceptance, WorkAcceptanceItem
 
 __all__ = [
     "Base", "User", "Project", "Task", "TaskInputFile",
@@ -20,4 +21,6 @@ __all__ = [
     "PriceList", "PriceWork", "PriceMaterial",
     "CompanySettings", "Contractor", "PriceCatalog", "GeneratedDocument",
     "ProjectGallery", "ProjectPayment",
+    "SubcontractorAssignment", "WorkAcceptance", "WorkAcceptanceItem",
 ]
+

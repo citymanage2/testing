@@ -6,6 +6,8 @@ import VersionHistoryDrawer from '../components/VersionHistoryDrawer';
 import OptimizationChecklist from '../components/OptimizationChecklist';
 import AnaloguePanel from '../components/AnaloguePanel';
 import DocumentGenerator from '../components/DocumentGenerator';
+import WorkAcceptancePanel from '../components/WorkAcceptancePanel';
+import AiAssistModal from '../components/AiAssistModal';
 import { C, btnPrimary, btnOutline, btnDanger, btnGhost, INPUT, LBL, CARD, TH, TD, OVERLAY, MODAL } from '../ui';
 
 interface Item {
@@ -70,6 +72,9 @@ export default function EstimateView() {
   const [batchSectionTarget, setBatchSectionTarget] = useState('');
   const [showBatchCoeff, setShowBatchCoeff] = useState(false);
   const [batchCoeff, setBatchCoeff] = useState('1');
+  const [fullscreen, setFullscreen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'estimate' | 'acceptance' | 'docs'>('estimate');
+  const [showAiAssist, setShowAiAssist] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
@@ -109,7 +114,7 @@ export default function EstimateView() {
 
   function startEdit(item: Item, field: string) {
     setEditCell({ itemId: item.id, field });
-    const val = field === 'work_price' ? item.price_work : field === 'mat_price' ? item.price_material : field === 'quantity' ? item.quantity : field === 'source_url' ? (item.source_url || '') : '';
+    const val = field === 'work_price' ? item.price_work : field === 'mat_price' ? item.price_material : field === 'quantity' ? item.quantity : field === 'source_url' ? (item.source_url || '') : field === 'comment' ? (item.comment || '') : '';
     setEditVal(String(val));
   }
 
@@ -333,7 +338,7 @@ export default function EstimateView() {
   const grandTotal = grandBase + grandVat;
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={fullscreen ? { position: 'fixed', inset: 0, zIndex: 200, overflowY: 'auto', background: C.surfaceAlt, padding: '16px 20px' } : { padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
       {/* ── Page header ───────────────────────────────────────────────── */}
       <div style={{ ...CARD, marginBottom: 16, padding: '16px 20px' }}>
         {/* Title row */}
@@ -386,6 +391,12 @@ export default function EstimateView() {
               <button onClick={() => { setShowMove(false); loadProjects(); setShowMove(true); }} style={btnGhost('sm')}>↗ Переместить</button>
               <button onClick={() => { setKpSelected(new Set()); setKpComment(''); setShowKP(true); }} style={btnGhost('sm')}>📨 Запрос КП</button>
               <button onClick={() => setShowSepSheet(true)} style={btnGhost('sm')}>📑 Ведомость</button>
+            </div>
+
+            {/* AI + fullscreen */}
+            <div style={{ display: 'flex', gap: 4, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 4px' }}>
+              <button onClick={() => setShowAiAssist(true)} style={btnGhost('sm')} title="ИИ-помощник">🤖 ИИ</button>
+              <button onClick={() => setFullscreen(f => !f)} style={btnGhost('sm')} title={fullscreen ? 'Свернуть' : 'Полный экран'}>{fullscreen ? '⊡' : '⛶'}</button>
             </div>
 
             {/* Destructive */}
@@ -486,6 +497,25 @@ export default function EstimateView() {
         </div>
       )}
 
+      {/* ── Content tabs ──────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 2, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 7, padding: 3, marginBottom: 14, width: 'fit-content' }}>
+        {([['estimate', '📋 Смета'], ['acceptance', '✅ Субподрядчики'], ['docs', '📄 Документы']] as const).map(([t, l]) => (
+          <button key={t} onClick={() => setActiveTab(t)}
+            style={{ padding: '5px 16px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: activeTab === t ? 600 : 400, background: activeTab === t ? C.surface : 'transparent', color: activeTab === t ? C.primary : C.textSec, boxShadow: activeTab === t ? '0 1px 3px rgba(0,0,0,.1)' : 'none' }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'acceptance' && id && data && (
+        <WorkAcceptancePanel taskId={id} items={data.items.map(i => ({ id: i.id, name: i.name, unit: i.unit, quantity: i.quantity, type: i.type, section: i.section, row_type: i.row_type }))} />
+      )}
+
+      {activeTab === 'docs' && id && (
+        <DocumentGenerator taskId={id} />
+      )}
+
+      {activeTab === 'estimate' && <>
       {/* Legend */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 12, color: C.textSec, alignItems: 'center' }}>
         <span style={{ background: '#fffbeb', border: `1px solid ${C.warning}40`, color: C.warning, padding: '2px 8px', borderRadius: 4 }}>Оптимизировано</span>
@@ -745,21 +775,12 @@ export default function EstimateView() {
         </div>
       )}
 
-      {/* Document generation */}
-      {id && (
-        <div style={{ marginTop: 16 }}>
-          <details>
-            <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: '6px 0', color: C.primary, userSelect: 'none' }}>
-              📄 Формирование документов (Смета, КС-2, КС-3)
-            </summary>
-            <DocumentGenerator taskId={id} />
-          </details>
-        </div>
-      )}
+      </>}
 
       {showHistory && id && <VersionHistoryDrawer taskId={id} onClose={() => setShowHistory(false)} onRestored={() => { setShowHistory(false); load(); }} />}
       {showOpt && id && <OptimizationChecklist taskId={id} onClose={() => setShowOpt(false)} onOptimized={() => { setShowOpt(false); load(); }} />}
       {analogueItemId && id && analogueItem && <AnaloguePanel taskId={id} itemId={analogueItemId} isAnalogue={analogueItem.is_analogue} onClose={() => setAnalogueItemId(null)} onApplied={() => { setAnalogueItemId(null); load(); }} />}
+      {showAiAssist && id && <AiAssistModal taskId={id} onClose={() => setShowAiAssist(false)} />}
       <input ref={importRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleImport} />
     </div>
   );

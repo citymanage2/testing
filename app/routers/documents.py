@@ -17,6 +17,7 @@ from app.models.estimate_item import EstimateItem
 from app.models.company import CompanySettings
 from app.models.contractor import Contractor
 from app.models.generated_document import GeneratedDocument
+from app.models.work_acceptance import WorkAcceptance, WorkAcceptanceItem
 from app.services.ks_service import build_ks2, build_ks3, build_estimate_xlsx
 
 router = APIRouter()
@@ -93,6 +94,20 @@ class KS2Params(BaseModel):
     period_start: date
     period_end: date
     act_number: str = "1"
+    acceptance_id: Optional[str] = None  # if set, use only items from this acceptance
+
+
+class _AcceptanceItemProxy:
+    """Duck-typed proxy so build_ks2 can consume acceptance items as if they were EstimateItems."""
+    def __init__(self, est_item: EstimateItem, qty_accepted: float):
+        self.row_type = getattr(est_item, "row_type", "item")
+        self.name = est_item.name
+        self.unit = est_item.unit
+        self.section = est_item.section
+        self.quantity = qty_accepted
+        self.work_price = est_item.work_price
+        self.mat_price = est_item.mat_price
+        self.position = est_item.position
 
 
 @router.post("/estimates/{task_id}/documents/ks2")
@@ -102,16 +117,41 @@ async def generate_ks2(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    task, items, extras, vat_rate = await _get_task_items(task_id, current_user.id, db)
+    task, all_items, extras, vat_rate = await _get_task_items(task_id, current_user.id, db)
     company_row = await _get_company(current_user.id, db)
     contractor_row = await db.get(Contractor, body.contractor_id) if body.contractor_id else None
+
+    if body.acceptance_id:
+        acc = await db.get(WorkAcceptance, body.acceptance_id)
+        if not acc or acc.estimate_id != task_id:
+            raise HTTPException(status_code=404, detail="Acceptance not found")
+        acc_items = (await db.execute(
+            select(WorkAcceptanceItem).where(WorkAcceptanceItem.acceptance_id == body.acceptance_id)
+        )).scalars().all()
+        item_map = {i.id: i for i in all_items}
+        items = [_AcceptanceItemProxy(item_map[ai.estimate_item_id], ai.quantity_accepted)
+                 for ai in acc_items if ai.estimate_item_id in item_map]
+        # use acceptance contractor if not overridden
+        if not contractor_row and acc.contractor_id:
+            contractor_row = await db.get(Contractor, acc.contractor_id)
+        # use acceptance period if not specified
+        p_start = acc.period_start or body.period_start
+        p_end = acc.period_end or body.period_end
+        act_num = acc.act_number
+    else:
+        items = all_items
+        p_start = body.period_start
+        p_end = body.period_end
+        act_num = body.act_number
+
     data = build_ks2(
         items, extras, _company_dict(company_row), _contractor_dict(contractor_row),
-        body.period_start, body.period_end, body.act_number, vat_rate,
+        p_start, p_end, act_num, vat_rate,
     )
-    file_name = f"ks2_act{body.act_number}_{task_id[:8]}.xlsx"
+    file_name = f"ks2_act{act_num}_{task_id[:8]}.xlsx"
     await _save_doc(task_id, current_user.id, "ks2", file_name, data, XLSX_MIME,
-                    {"act_number": body.act_number, "period_start": str(body.period_start), "period_end": str(body.period_end)}, db)
+                    {"act_number": act_num, "period_start": str(p_start), "period_end": str(p_end),
+                     "acceptance_id": body.acceptance_id}, db)
     return Response(content=data, media_type=XLSX_MIME, headers={"Content-Disposition": f'attachment; filename="{file_name}"'})
 
 

@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone
+import io
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+
+import openpyxl
+from openpyxl.styles import Font
 
 from app.database import get_db
 from app.auth import get_current_user
@@ -33,6 +38,7 @@ class CatalogEntryOut(BaseModel):
     mat_price: float
     tags: Optional[list]
     created_at: datetime
+    updated_at: datetime
 
 
 def _out(r: PriceCatalog) -> CatalogEntryOut:
@@ -40,6 +46,7 @@ def _out(r: PriceCatalog) -> CatalogEntryOut:
         id=r.id, item_type=r.item_type, name=r.name, unit=r.unit,
         work_price=r.work_price, mat_price=r.mat_price,
         tags=r.tags or [], created_at=r.created_at,
+        updated_at=r.updated_at,
     )
 
 
@@ -133,3 +140,130 @@ async def delete_catalog_entry(
     await db.delete(row)
     await db.commit()
     return {"ok": True}
+
+
+@router.get("/template")
+async def download_catalog_template():
+    """Return an Excel template file for catalog import. No auth required."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Каталог"
+
+    headers = [
+        "Тип (work/material)",
+        "Наименование",
+        "Единица",
+        "Цена работ ₽",
+        "Цена материалов ₽",
+        "Теги (через запятую)",
+    ]
+    bold_font = Font(bold=True)
+    for col_idx, header in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = bold_font
+
+    # Example rows
+    ws.append(["work", "Укладка плитки", "м²", "1500", "0", "плитка, укладка"])
+    ws.append(["material", "Плитка керамическая", "м²", "0", "800", "плитка"])
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    xlsx_bytes = buffer.read()
+
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=\"catalog_template.xlsx\""},
+    )
+
+
+@router.post("/import-excel")
+async def import_catalog_from_excel(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Accept an Excel file upload and upsert catalog entries for the current user."""
+    contents = await file.read()
+    errors: list[str] = []
+    imported = 0
+    updated = 0
+
+    try:
+        wb = openpyxl.load_workbook(filename=io.BytesIO(contents), data_only=True)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Не удалось открыть файл Excel: {exc}")
+
+    ws = wb.active
+
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        # Need at least column B (index 1) to be non-empty
+        name = row[1] if len(row) > 1 else None
+        if not name or not str(name).strip():
+            continue
+
+        name = str(name).strip()
+
+        # Column A: item_type
+        raw_type = str(row[0]).strip().lower() if row[0] else ""
+        item_type = "material" if raw_type == "material" else "work"
+
+        # Column C: unit
+        unit = str(row[2]).strip() if len(row) > 2 and row[2] else None
+
+        # Column D: work_price
+        try:
+            work_price = float(row[3]) if len(row) > 3 and row[3] is not None else 0.0
+        except (ValueError, TypeError):
+            errors.append(f"Строка {row_idx}: неверный формат цены работ «{row[3]}», используется 0.")
+            work_price = 0.0
+
+        # Column E: mat_price
+        try:
+            mat_price = float(row[4]) if len(row) > 4 and row[4] is not None else 0.0
+        except (ValueError, TypeError):
+            errors.append(f"Строка {row_idx}: неверный формат цены материалов «{row[4]}», используется 0.")
+            mat_price = 0.0
+
+        # Column F: tags (comma-separated)
+        tags: Optional[list] = None
+        if len(row) > 5 and row[5]:
+            raw_tags = str(row[5]).strip()
+            if raw_tags:
+                tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
+
+        # Upsert: find existing entry by user_id + name + item_type
+        existing_result = await db.execute(
+            select(PriceCatalog).where(
+                PriceCatalog.user_id == current_user.id,
+                PriceCatalog.name == name,
+                PriceCatalog.item_type == item_type,
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+
+        if existing:
+            existing.unit = unit
+            existing.work_price = work_price
+            existing.mat_price = mat_price
+            if tags is not None:
+                existing.tags = tags
+            existing.updated_at = datetime.now(timezone.utc)
+            updated += 1
+        else:
+            new_entry = PriceCatalog(
+                id=str(uuid.uuid4()),
+                user_id=current_user.id,
+                item_type=item_type,
+                name=name,
+                unit=unit,
+                work_price=work_price,
+                mat_price=mat_price,
+                tags=tags or [],
+            )
+            db.add(new_entry)
+            imported += 1
+
+    await db.commit()
+    return {"imported": imported, "updated": updated, "errors": errors}
