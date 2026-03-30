@@ -28,7 +28,7 @@ async def _get_estimate(task_id: str, user: User, db: AsyncSession) -> Task:
     task = result.scalar_one_or_none()
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Estimate not found")
-    if task.owner_id != user.id:
+    if task.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return task
 
