@@ -6,6 +6,10 @@ import TaskCreate from './pages/TaskCreate';
 import TaskStatus from './pages/TaskStatus';
 import EstimateView from './pages/EstimateView';
 import Admin from './pages/Admin';
+import CompanySettings from './pages/CompanySettings';
+import Contractors from './pages/Contractors';
+import Catalog from './pages/Catalog';
+import RoomCalculator from './pages/RoomCalculator';
 
 export default function App() {
   return (
@@ -18,6 +22,10 @@ export default function App() {
             <Route path="/task/create" element={<TaskCreate />} />
             <Route path="/task/:id/status" element={<TaskStatus />} />
             <Route path="/task/:id/estimate" element={<EstimateView />} />
+            <Route path="/catalog" element={<Catalog />} />
+            <Route path="/contractors" element={<Contractors />} />
+            <Route path="/calculator" element={<RoomCalculator />} />
+            <Route path="/settings/company" element={<CompanySettings />} />
           </Route>
         </Route>
         <Route element={<ProtectedRoute adminOnly />}>

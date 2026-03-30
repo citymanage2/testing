@@ -252,6 +252,13 @@ export default function EstimateView() {
     load();
   }
 
+  async function saveItemToCatalog(itemId: string) {
+    try {
+      await client.post(`/catalog/from-estimate-item/${itemId}`);
+      alert('Сохранено в каталог расценок');
+    } catch { alert('Ошибка сохранения в каталог'); }
+  }
+
   function handleDragStart(e: React.DragEvent, itemId: string) {
     setDragItemId(itemId);
     e.dataTransfer.effectAllowed = 'move';
@@ -527,6 +534,7 @@ export default function EstimateView() {
                           {item.type === 'Материал' && (
                             <button onClick={() => setAnalogueItemId(item.id)} style={{ padding: '2px 8px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Аналоги</button>
                           )}
+                          <button onClick={() => saveItemToCatalog(item.id)} title="Сохранить в каталог" style={{ padding: '2px 7px', background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>📋</button>
                           <button onClick={() => deleteItem(item.id)} style={{ padding: '2px 6px', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>✕</button>
                         </div>
                       </td>

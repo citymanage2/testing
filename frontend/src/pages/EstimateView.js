@@ -252,6 +252,15 @@ export default function EstimateView() {
         setShowBatchCoeff(false);
         load();
     }
+    async function saveItemToCatalog(itemId) {
+        try {
+            await client.post(`/catalog/from-estimate-item/${itemId}`);
+            alert('Сохранено в каталог расценок');
+        }
+        catch {
+            alert('Ошибка сохранения в каталог');
+        }
+    }
     function handleDragStart(e, itemId) {
         setDragItemId(itemId);
         e.dataTransfer.effectAllowed = 'move';
@@ -352,7 +361,7 @@ export default function EstimateView() {
                                         const rowBg = dragOverId === item.id ? '#bbdefb' : item.is_optimized ? '#FFF3CD' : item.is_analogue ? '#C8E6C9' : undefined;
                                         rows.push(_jsxs("tr", { draggable: true, onDragStart: e => handleDragStart(e, item.id), onDragOver: e => handleDragOver(e, item.id), onDrop: e => handleDrop(e, item.id), onDragLeave: () => setDragOverId(null), style: { background: rowBg, outline: selectedIds.has(item.id) ? '2px solid #1976d2' : undefined }, children: [_jsx("td", { style: { ...td, textAlign: 'center' }, children: _jsx("input", { type: "checkbox", checked: selectedIds.has(item.id), onChange: () => toggleSelect(item.id) }) }), _jsx("td", { style: { ...td, textAlign: 'center', color: '#bbb', cursor: 'grab' }, children: "\u283F" }), _jsx("td", { style: td, children: item.position }), _jsx("td", { style: td, children: item.section }), _jsx("td", { style: td, children: item.type }), _jsxs("td", { style: { ...td, maxWidth: 280 }, children: [item.name, item.is_analogue && _jsx("span", { style: { marginLeft: 6, padding: '1px 5px', background: '#4caf50', color: '#fff', borderRadius: 10, fontSize: 10 }, children: "\u0430\u043D\u0430\u043B\u043E\u0433" }), item.is_optimized && _jsx("span", { style: { marginLeft: 4, padding: '1px 5px', background: '#ff9800', color: '#fff', borderRadius: 10, fontSize: 10 }, children: "\u043E\u043F\u0442" })] }), _jsx("td", { style: td, children: item.unit }), _jsx("td", { style: { ...td, minWidth: 60 }, children: editInput(item, 'quantity') }), _jsx("td", { style: { ...td, minWidth: 80 }, children: editInput(item, 'work_price') }), _jsx("td", { style: { ...td, minWidth: 80 }, children: editInput(item, 'mat_price') }), _jsx("td", { style: td, children: fmt(item.total) }), _jsx("td", { style: { ...td, minWidth: 120 }, children: item.type === 'Материал' && (item.source_url
                                                         ? _jsxs("a", { href: item.source_url, target: "_blank", rel: "noopener noreferrer", style: { fontSize: 11, color: '#1565c0', wordBreak: 'break-all' }, children: ["\uD83D\uDD17 ", item.source_url.replace(/^https?:\/\//, '').slice(0, 25), "\u2026"] })
-                                                        : editInput(item, 'source_url')) }), _jsx("td", { style: { ...td, minWidth: 120 }, children: editInput(item, 'comment') }), _jsx("td", { style: td, children: _jsxs("div", { style: { display: 'flex', gap: 4 }, children: [item.type === 'Материал' && (_jsx("button", { onClick: () => setAnalogueItemId(item.id), style: { padding: '2px 8px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }, children: "\u0410\u043D\u0430\u043B\u043E\u0433\u0438" })), _jsx("button", { onClick: () => deleteItem(item.id), style: { padding: '2px 6px', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 4, cursor: 'pointer', fontSize: 11 }, children: "\u2715" })] }) })] }, item.id));
+                                                        : editInput(item, 'source_url')) }), _jsx("td", { style: { ...td, minWidth: 120 }, children: editInput(item, 'comment') }), _jsx("td", { style: td, children: _jsxs("div", { style: { display: 'flex', gap: 4 }, children: [item.type === 'Материал' && (_jsx("button", { onClick: () => setAnalogueItemId(item.id), style: { padding: '2px 8px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }, children: "\u0410\u043D\u0430\u043B\u043E\u0433\u0438" })), _jsx("button", { onClick: () => saveItemToCatalog(item.id), title: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0432 \u043A\u0430\u0442\u0430\u043B\u043E\u0433", style: { padding: '2px 7px', background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7', borderRadius: 4, cursor: 'pointer', fontSize: 11 }, children: "\uD83D\uDCCB" }), _jsx("button", { onClick: () => deleteItem(item.id), style: { padding: '2px 6px', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 4, cursor: 'pointer', fontSize: 11 }, children: "\u2715" })] }) })] }, item.id));
                                     }
                                 });
                                 return rows;
