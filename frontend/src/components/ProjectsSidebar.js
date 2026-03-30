@@ -2,6 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
+import { C } from '../ui';
 function fmt(v) { return v.toLocaleString('ru-RU', { maximumFractionDigits: 0 }); }
 const TYPE_LABELS = {
     SMETA_FROM_PROJECT: 'Смета из проекта', SMETA_FROM_TZ: 'Смета из ТЗ', SMETA_FROM_LIST: 'Смета из перечня',
@@ -9,6 +10,7 @@ const TYPE_LABELS = {
     LIST_FROM_TZ: 'Перечень из ТЗ', LIST_FROM_PROJECT: 'Перечень из проекта', LIST_FROM_TZ_PROJECT: 'Перечень ТЗ+проект',
     RESEARCH_PROJECT: 'Исследование', SCAN_TO_EXCEL: 'Скан→Excel', COMPARE_PROJECT_SMETA: 'Сравнение', IMPORT_EXCEL: 'Импорт Excel',
 };
+const STATUS_COLOR = { completed: C.success, failed: C.danger, processing: C.warning };
 export default function ProjectsSidebar() {
     const [projects, setProjects] = useState([]);
     const [expanded, setExpanded] = useState(null);
@@ -48,7 +50,7 @@ export default function ProjectsSidebar() {
             if (expanded === projectId)
                 refreshDetail(projectId);
         }
-        catch { /* ignore */ }
+        catch { }
     }
     async function refreshDetail(id) {
         setLoadingDetail(true);
@@ -98,16 +100,46 @@ export default function ProjectsSidebar() {
             setImportProjectId(null);
         }
     }
-    return (_jsxs("div", { style: { padding: '12px 8px' }, children: [_jsx("button", { onClick: async () => { const n = prompt('Название проекта:'); if (n?.trim()) {
-                    await client.post('/projects', { name: n.trim() });
-                    load();
-                } }, style: newProjectBtn, children: "+ \u041D\u043E\u0432\u044B\u0439 \u043F\u0440\u043E\u0435\u043A\u0442" }), _jsxs("div", { style: { marginBottom: 8 }, children: [_jsxs("div", { onClick: () => setShowNoProject(v => !v), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 4, cursor: 'pointer', background: '#fff3e0', fontSize: 13, fontWeight: 600 }, children: [_jsx("span", { style: { fontSize: 10, color: '#e65100' }, children: showNoProject ? '▼' : '▶' }), _jsx("span", { style: { flex: 1, color: '#e65100' }, children: "\u0411\u0435\u0437 \u043F\u0440\u043E\u0435\u043A\u0442\u0430" }), _jsx("span", { style: { fontSize: 11, color: '#e65100', background: '#ffe0b2', borderRadius: 10, padding: '1px 7px' }, children: noProjectTasks.length })] }), showNoProject && (_jsx("div", { style: { paddingLeft: 12 }, children: noProjectTasks.length === 0
-                            ? _jsx("p", { style: { color: '#aaa', fontSize: 12, margin: '4px 8px' }, children: "\u041F\u0443\u0441\u0442\u043E" })
-                            : noProjectTasks.map(t => (_jsxs("div", { draggable: true, onDragStart: e => e.dataTransfer.setData('text/plain', t.id), onClick: () => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`), style: { padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12, color: '#1565c0', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }, title: "\u041F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435 \u0432 \u043F\u0440\u043E\u0435\u043A\u0442", children: [_jsx("span", { style: { color: '#bbb', fontSize: 10 }, children: "\u283F" }), _jsx("span", { style: { flex: 1 }, children: t.name || TYPE_LABELS[t.task_type] || t.task_type }), _jsx("span", { style: { fontSize: 10, color: t.status === 'completed' ? '#4caf50' : t.status === 'failed' ? '#f44336' : '#ff9800' }, children: "\u25CF" })] }, t.id))) }))] }), projects.length === 0 && _jsx("p", { style: { color: '#aaa', fontSize: 13, textAlign: 'center' }, children: "\u041D\u0435\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432" }), projects.map(p => (_jsxs("div", { style: { marginBottom: 4 }, children: [_jsxs("div", { onClick: () => toggleProject(p.id), onDragOver: e => { e.preventDefault(); setDragOver(p.id); }, onDragLeave: () => setDragOver(null), onDrop: e => handleDrop(p.id, e), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 4, cursor: 'pointer', background: dragOver === p.id ? '#bbdefb' : expanded === p.id ? '#e3f2fd' : 'transparent', fontSize: 13, fontWeight: 500 }, children: [_jsx("span", { style: { fontSize: 10, color: '#999' }, children: expanded === p.id ? '▼' : '▶' }), _jsx("span", { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }, children: p.name }), _jsx("span", { onClick: e => { e.stopPropagation(); navigate(`/projects/${p.id}`); }, title: "\u041A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u043F\u0440\u043E\u0435\u043A\u0442\u0430", style: { fontSize: 12, color: '#90a4ae', cursor: 'pointer', padding: '0 2px' }, children: "\u229E" })] }), expanded === p.id && (_jsx("div", { style: { paddingLeft: 12 }, children: loadingDetail ? _jsx("p", { style: { color: '#aaa', fontSize: 12, margin: '4px 8px' }, children: "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430..." }) : (_jsxs(_Fragment, { children: [totals && totals.tasks_count > 0 && (_jsxs("div", { style: { margin: '6px 8px', padding: '8px', background: '#f0f4ff', borderRadius: 4, fontSize: 11 }, children: [_jsxs("div", { style: { fontWeight: 600, marginBottom: 4 }, children: ["\u0418\u0442\u043E\u0433\u043E \u043F\u043E \u043F\u0440\u043E\u0435\u043A\u0442\u0443 (", totals.tasks_count, " \u0441\u043C\u0435\u0442", totals.tasks_count > 1 ? 'ы' : 'а', "):"] }), _jsxs("div", { children: ["\u0420\u0430\u0431\u043E\u0442\u044B: ", fmt(totals.total_work), " \u20BD"] }), _jsxs("div", { children: ["\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B: ", fmt(totals.total_mat), " \u20BD"] }), _jsxs("div", { children: ["\u041D\u0414\u0421: ", fmt(totals.total_vat), " \u20BD"] }), _jsxs("div", { style: { fontWeight: 700, marginTop: 2 }, children: ["\u0418\u0422\u041E\u0413\u041E: ", fmt(totals.total + totals.total_vat), " \u20BD"] })] })), _jsx("button", { onClick: () => { setImportProjectId(p.id); importRef.current?.click(); }, style: { width: '100%', padding: '4px 8px', margin: '4px 0', background: '#e8f5e9', border: '1px solid #a5d6a7', borderRadius: 4, cursor: 'pointer', fontSize: 12, color: '#2e7d32' }, children: "\u2B06 \u0418\u043C\u043F\u043E\u0440\u0442 Excel" }), !detail || detail.tasks.length === 0
-                                    ? _jsx("p", { style: { color: '#aaa', fontSize: 12, margin: '4px 8px' }, children: "\u041D\u0435\u0442 \u0441\u043C\u0435\u0442" })
-                                    : detail.tasks.map(t => (_jsxs("div", { style: { padding: '3px 8px', borderRadius: 4, fontSize: 12, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }, children: [_jsxs("span", { onClick: () => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`), style: { flex: 1, cursor: 'pointer', color: '#1565c0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, children: [t.name || TYPE_LABELS[t.task_type] || t.task_type, t.doc_type && _jsxs("span", { style: { marginLeft: 4, fontSize: 10, color: '#888' }, children: ["[", t.doc_type, "]"] })] }), _jsx("span", { style: { fontSize: 10, color: t.status === 'completed' ? '#4caf50' : t.status === 'failed' ? '#f44336' : '#ff9800' }, children: "\u25CF" }), _jsx("button", { onClick: async (e) => { e.stopPropagation(); if (confirm('Удалить смету?')) {
-                                                    await client.delete(`/tasks/${t.id}`);
-                                                    refreshDetail(p.id);
-                                                } }, style: { padding: '1px 5px', fontSize: 10, background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 3, cursor: 'pointer' }, children: "\u2715" })] }, t.id)))] })) }))] }, p.id))), _jsx("input", { ref: importRef, type: "file", accept: ".xlsx", style: { display: 'none' }, onChange: handleImport })] }));
+    async function addProject() {
+        const n = prompt('Название проекта:');
+        if (n?.trim()) {
+            await client.post('/projects', { name: n.trim() });
+            load();
+        }
+    }
+    return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', height: '100%' }, children: [_jsx("div", { style: { padding: '12px 12px 8px', borderBottom: `1px solid ${C.border}` }, children: _jsxs("button", { onClick: addProject, style: {
+                        width: '100%', padding: '7px 12px', background: C.primary, color: '#fff',
+                        border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    }, children: [_jsx("span", { style: { fontSize: 16, lineHeight: 1 }, children: "+" }), " \u041D\u043E\u0432\u044B\u0439 \u043F\u0440\u043E\u0435\u043A\u0442"] }) }), _jsxs("div", { style: { flex: 1, overflowY: 'auto', padding: '8px' }, children: [_jsx(SideSection, { label: "\u0411\u0435\u0437 \u043F\u0440\u043E\u0435\u043A\u0442\u0430", count: noProjectTasks.length, open: showNoProject, onToggle: () => setShowNoProject(v => !v), accent: true, children: noProjectTasks.length === 0
+                            ? _jsx(EmptyMsg, { children: "\u041D\u0435\u0442 \u0437\u0430\u0434\u0430\u0447" })
+                            : noProjectTasks.map(t => (_jsx(TaskRow, { task: t, onNavigate: () => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`), draggable: true }, t.id))) }), projects.length === 0
+                        ? _jsx(EmptyMsg, { children: "\u041D\u0435\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432" })
+                        : projects.map(p => (_jsxs("div", { style: { marginBottom: 2 }, children: [_jsxs("div", { onClick: () => toggleProject(p.id), onDragOver: e => { e.preventDefault(); setDragOver(p.id); }, onDragLeave: () => setDragOver(null), onDrop: e => handleDrop(p.id, e), style: {
+                                        display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px',
+                                        borderRadius: 6, cursor: 'pointer', userSelect: 'none',
+                                        background: dragOver === p.id ? C.primaryBg : expanded === p.id ? C.primaryBg : 'transparent',
+                                        border: `1px solid ${dragOver === p.id || expanded === p.id ? C.primary + '33' : 'transparent'}`,
+                                    }, children: [_jsx("span", { style: { fontSize: 10, color: expanded === p.id ? C.primary : C.textMuted, width: 10, textAlign: 'center', flexShrink: 0 }, children: expanded === p.id ? '▼' : '▶' }), _jsx("span", { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, fontSize: 13, fontWeight: 500, color: expanded === p.id ? C.primary : C.text }, children: p.name }), _jsx("span", { onClick: e => { e.stopPropagation(); navigate(`/projects/${p.id}`); }, title: "\u041A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u043F\u0440\u043E\u0435\u043A\u0442\u0430", style: { fontSize: 14, color: C.textMuted, cursor: 'pointer', padding: '0 2px', flexShrink: 0, opacity: .7 }, children: "\u229E" })] }), expanded === p.id && (_jsx("div", { style: { paddingLeft: 14, paddingBottom: 4 }, children: loadingDetail
+                                        ? _jsx(EmptyMsg, { children: "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430..." })
+                                        : (_jsxs(_Fragment, { children: [totals && totals.tasks_count > 0 && (_jsxs("div", { style: { margin: '6px 0', padding: '8px 10px', background: C.primaryBg, borderRadius: 6, fontSize: 11, border: `1px solid ${C.primary}22` }, children: [_jsxs("div", { style: { fontWeight: 600, color: C.primary, marginBottom: 4 }, children: ["\u0418\u0442\u043E\u0433\u043E (", totals.tasks_count, " ", totals.tasks_count === 1 ? 'смета' : 'сметы', ")"] }), _jsxs("div", { style: { color: C.textSec }, children: ["\u0420\u0430\u0431\u043E\u0442\u044B: ", _jsxs("b", { children: [fmt(totals.total_work), " \u20BD"] })] }), _jsxs("div", { style: { color: C.textSec }, children: ["\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B: ", _jsxs("b", { children: [fmt(totals.total_mat), " \u20BD"] })] }), _jsxs("div", { style: { color: C.text, fontWeight: 700, marginTop: 3 }, children: ["\u0421 \u041D\u0414\u0421: ", fmt(totals.total + totals.total_vat), " \u20BD"] })] })), _jsx("button", { onClick: () => { setImportProjectId(p.id); importRef.current?.click(); }, style: { display: 'flex', alignItems: 'center', gap: 5, width: '100%', padding: '5px 8px', margin: '4px 0', background: 'transparent', border: `1px dashed ${C.border}`, borderRadius: 5, cursor: 'pointer', fontSize: 12, color: C.textSec }, children: "\u2B06 \u0418\u043C\u043F\u043E\u0440\u0442 Excel" }), !detail || detail.tasks.length === 0
+                                                    ? _jsx(EmptyMsg, { children: "\u041D\u0435\u0442 \u0441\u043C\u0435\u0442" })
+                                                    : detail.tasks.map(t => (_jsx(TaskRow, { task: t, onNavigate: () => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`), onDelete: async () => { if (confirm('Удалить смету?')) {
+                                                            await client.delete(`/tasks/${t.id}`);
+                                                            refreshDetail(p.id);
+                                                        } } }, t.id)))] })) }))] }, p.id)))] }), _jsx("input", { ref: importRef, type: "file", accept: ".xlsx", style: { display: 'none' }, onChange: handleImport })] }));
 }
-const newProjectBtn = { width: '100%', padding: '7px 12px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13, marginBottom: 12 };
+function SideSection({ label, count, open, onToggle, accent, children }) {
+    return (_jsxs("div", { style: { marginBottom: 8 }, children: [_jsxs("div", { onClick: onToggle, style: {
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+                    borderRadius: 6, cursor: 'pointer', userSelect: 'none',
+                    background: accent ? C.warningBg : C.surfaceAlt,
+                    border: `1px solid ${accent ? C.warning + '40' : C.border}`,
+                }, children: [_jsx("span", { style: { fontSize: 10, color: accent ? C.warning : C.textMuted }, children: open ? '▼' : '▶' }), _jsx("span", { style: { flex: 1, fontSize: 13, fontWeight: 600, color: accent ? C.warning : C.text }, children: label }), count > 0 && _jsx("span", { style: { fontSize: 11, padding: '1px 7px', borderRadius: 99, background: accent ? C.warning + '20' : C.border, color: accent ? C.warning : C.textSec, fontWeight: 600 }, children: count })] }), open && _jsx("div", { style: { paddingTop: 2 }, children: children })] }));
+}
+function TaskRow({ task: t, onNavigate, onDelete, draggable }) {
+    return (_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, cursor: 'pointer', marginBottom: 1 }, draggable: draggable, onDragStart: draggable ? e => e.dataTransfer.setData('text/plain', t.id) : undefined, children: [draggable && _jsx("span", { style: { color: C.textMuted, fontSize: 10, cursor: 'grab' }, children: "\u283F" }), _jsxs("span", { onClick: onNavigate, style: { flex: 1, fontSize: 12, color: C.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, title: t.name || TYPE_LABELS[t.task_type], children: [t.name || TYPE_LABELS[t.task_type] || t.task_type, t.doc_type && _jsxs("span", { style: { marginLeft: 4, fontSize: 10, color: C.textMuted }, children: ["[", t.doc_type, "]"] })] }), _jsx("span", { style: { fontSize: 8, color: STATUS_COLOR[t.status] || C.textMuted, flexShrink: 0 }, children: "\u25CF" }), onDelete && (_jsx("button", { onClick: e => { e.stopPropagation(); onDelete(); }, style: { padding: '1px 5px', fontSize: 10, background: 'transparent', color: C.textMuted, border: 'none', borderRadius: 3, cursor: 'pointer', flexShrink: 0, opacity: 0 }, className: "del-btn", children: "\u2715" }))] }));
+}
+function EmptyMsg({ children }) {
+    return _jsx("p", { style: { color: C.textMuted, fontSize: 12, margin: '4px 10px', fontStyle: 'italic' }, children: children });
+}

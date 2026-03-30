@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
+import { C } from '../ui';
 
 interface Project { id: string; name: string; }
 interface TaskRef { id: string; task_type: string; status: string; estimate_status?: string; name?: string; doc_type?: string; }
@@ -16,15 +17,17 @@ const TYPE_LABELS: Record<string, string> = {
   RESEARCH_PROJECT: 'Исследование', SCAN_TO_EXCEL: 'Скан→Excel', COMPARE_PROJECT_SMETA: 'Сравнение', IMPORT_EXCEL: 'Импорт Excel',
 };
 
+const STATUS_COLOR: Record<string, string> = { completed: C.success, failed: C.danger, processing: C.warning };
+
 export default function ProjectsSidebar() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [detail, setDetail] = useState<ProjectDetail | null>(null);
-  const [totals, setTotals] = useState<Totals | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [dragOver, setDragOver] = useState<string | null>(null);
-  const [noProjectTasks, setNoProjectTasks] = useState<TaskRef[]>([]);
-  const [showNoProject, setShowNoProject] = useState(true);
+  const [projects,        setProjects]        = useState<Project[]>([]);
+  const [expanded,        setExpanded]        = useState<string | null>(null);
+  const [detail,          setDetail]          = useState<ProjectDetail | null>(null);
+  const [totals,          setTotals]          = useState<Totals | null>(null);
+  const [loadingDetail,   setLoadingDetail]   = useState(false);
+  const [dragOver,        setDragOver]        = useState<string | null>(null);
+  const [noProjectTasks,  setNoProjectTasks]  = useState<TaskRef[]>([]);
+  const [showNoProject,   setShowNoProject]   = useState(true);
   const importRef = useRef<HTMLInputElement>(null);
   const [importProjectId, setImportProjectId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -44,7 +47,7 @@ export default function ProjectsSidebar() {
       await client.post(`/projects/${projectId}/estimates/${taskId}`);
       setNoProjectTasks(prev => prev.filter(t => t.id !== taskId));
       if (expanded === projectId) refreshDetail(projectId);
-    } catch { /* ignore */ }
+    } catch {}
   }
 
   async function refreshDetail(id: string) {
@@ -77,89 +80,141 @@ export default function ProjectsSidebar() {
     finally { if (importRef.current) importRef.current.value = ''; setImportProjectId(null); }
   }
 
-  return (
-    <div style={{ padding: '12px 8px' }}>
-      <button onClick={async () => { const n = prompt('Название проекта:'); if (n?.trim()) { await client.post('/projects', { name: n.trim() }); load(); } }} style={newProjectBtn}>+ Новый проект</button>
+  async function addProject() {
+    const n = prompt('Название проекта:');
+    if (n?.trim()) { await client.post('/projects', { name: n.trim() }); load(); }
+  }
 
-      {/* No-project section */}
-      <div style={{ marginBottom: 8 }}>
-        <div onClick={() => setShowNoProject(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 4, cursor: 'pointer', background: '#fff3e0', fontSize: 13, fontWeight: 600 }}>
-          <span style={{ fontSize: 10, color: '#e65100' }}>{showNoProject ? '▼' : '▶'}</span>
-          <span style={{ flex: 1, color: '#e65100' }}>Без проекта</span>
-          <span style={{ fontSize: 11, color: '#e65100', background: '#ffe0b2', borderRadius: 10, padding: '1px 7px' }}>{noProjectTasks.length}</span>
-        </div>
-        {showNoProject && (
-          <div style={{ paddingLeft: 12 }}>
-            {noProjectTasks.length === 0
-              ? <p style={{ color: '#aaa', fontSize: 12, margin: '4px 8px' }}>Пусто</p>
-              : noProjectTasks.map(t => (
-                <div key={t.id}
-                  draggable
-                  onDragStart={e => e.dataTransfer.setData('text/plain', t.id)}
-                  onClick={() => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`)}
-                  style={{ padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12, color: '#1565c0', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}
-                  title="Перетащите в проект"
-                >
-                  <span style={{ color: '#bbb', fontSize: 10 }}>⠿</span>
-                  <span style={{ flex: 1 }}>{t.name || TYPE_LABELS[t.task_type] || t.task_type}</span>
-                  <span style={{ fontSize: 10, color: t.status === 'completed' ? '#4caf50' : t.status === 'failed' ? '#f44336' : '#ff9800' }}>●</span>
-                </div>
-              ))}
-          </div>
-        )}
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Header */}
+      <div style={{ padding: '12px 12px 8px', borderBottom: `1px solid ${C.border}` }}>
+        <button onClick={addProject} style={{
+          width: '100%', padding: '7px 12px', background: C.primary, color: '#fff',
+          border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+        }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Новый проект
+        </button>
       </div>
 
-      {projects.length === 0 && <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center' }}>Нет проектов</p>}
-      {projects.map(p => (
-        <div key={p.id} style={{ marginBottom: 4 }}>
-          <div
-            onClick={() => toggleProject(p.id)}
-            onDragOver={e => { e.preventDefault(); setDragOver(p.id); }}
-            onDragLeave={() => setDragOver(null)}
-            onDrop={e => handleDrop(p.id, e)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 4, cursor: 'pointer', background: dragOver === p.id ? '#bbdefb' : expanded === p.id ? '#e3f2fd' : 'transparent', fontSize: 13, fontWeight: 500 }}
-          >
-            <span style={{ fontSize: 10, color: '#999' }}>{expanded === p.id ? '▼' : '▶'}</span>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.name}</span>
-            <span onClick={e => { e.stopPropagation(); navigate(`/projects/${p.id}`); }} title="Карточка проекта" style={{ fontSize: 12, color: '#90a4ae', cursor: 'pointer', padding: '0 2px' }}>⊞</span>
-          </div>
-          {expanded === p.id && (
-            <div style={{ paddingLeft: 12 }}>
-              {loadingDetail ? <p style={{ color: '#aaa', fontSize: 12, margin: '4px 8px' }}>Загрузка...</p> : (
-                <>
-                  {totals && totals.tasks_count > 0 && (
-                    <div style={{ margin: '6px 8px', padding: '8px', background: '#f0f4ff', borderRadius: 4, fontSize: 11 }}>
-                      <div style={{ fontWeight: 600, marginBottom: 4 }}>Итого по проекту ({totals.tasks_count} смет{totals.tasks_count > 1 ? 'ы' : 'а'}):</div>
-                      <div>Работы: {fmt(totals.total_work)} ₽</div>
-                      <div>Материалы: {fmt(totals.total_mat)} ₽</div>
-                      <div>НДС: {fmt(totals.total_vat)} ₽</div>
-                      <div style={{ fontWeight: 700, marginTop: 2 }}>ИТОГО: {fmt(totals.total + totals.total_vat)} ₽</div>
-                    </div>
-                  )}
-                  <button onClick={() => { setImportProjectId(p.id); importRef.current?.click(); }} style={{ width: '100%', padding: '4px 8px', margin: '4px 0', background: '#e8f5e9', border: '1px solid #a5d6a7', borderRadius: 4, cursor: 'pointer', fontSize: 12, color: '#2e7d32' }}>⬆ Импорт Excel</button>
-                  {!detail || detail.tasks.length === 0
-                    ? <p style={{ color: '#aaa', fontSize: 12, margin: '4px 8px' }}>Нет смет</p>
-                    : detail.tasks.map(t => (
-                      <div key={t.id} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 12, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span onClick={() => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`)}
-                          style={{ flex: 1, cursor: 'pointer', color: '#1565c0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {t.name || TYPE_LABELS[t.task_type] || t.task_type}
-                          {t.doc_type && <span style={{ marginLeft: 4, fontSize: 10, color: '#888' }}>[{t.doc_type}]</span>}
-                        </span>
-                        <span style={{ fontSize: 10, color: t.status === 'completed' ? '#4caf50' : t.status === 'failed' ? '#f44336' : '#ff9800' }}>●</span>
-                        <button onClick={async (e) => { e.stopPropagation(); if (confirm('Удалить смету?')) { await client.delete(`/tasks/${t.id}`); refreshDetail(p.id); } }}
-                          style={{ padding: '1px 5px', fontSize: 10, background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 3, cursor: 'pointer' }}>✕</button>
-                      </div>
-                    ))}
-                </>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+        {/* No-project tasks */}
+        <SideSection
+          label="Без проекта"
+          count={noProjectTasks.length}
+          open={showNoProject}
+          onToggle={() => setShowNoProject(v => !v)}
+          accent
+        >
+          {noProjectTasks.length === 0
+            ? <EmptyMsg>Нет задач</EmptyMsg>
+            : noProjectTasks.map(t => (
+              <TaskRow key={t.id} task={t} onNavigate={() => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`)} draggable />
+            ))}
+        </SideSection>
+
+        {/* Projects */}
+        {projects.length === 0
+          ? <EmptyMsg>Нет проектов</EmptyMsg>
+          : projects.map(p => (
+            <div key={p.id} style={{ marginBottom: 2 }}>
+              <div
+                onClick={() => toggleProject(p.id)}
+                onDragOver={e => { e.preventDefault(); setDragOver(p.id); }}
+                onDragLeave={() => setDragOver(null)}
+                onDrop={e => handleDrop(p.id, e)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px',
+                  borderRadius: 6, cursor: 'pointer', userSelect: 'none',
+                  background: dragOver === p.id ? C.primaryBg : expanded === p.id ? C.primaryBg : 'transparent',
+                  border: `1px solid ${dragOver === p.id || expanded === p.id ? C.primary + '33' : 'transparent'}`,
+                }}
+              >
+                <span style={{ fontSize: 10, color: expanded === p.id ? C.primary : C.textMuted, width: 10, textAlign: 'center', flexShrink: 0 }}>{expanded === p.id ? '▼' : '▶'}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, fontSize: 13, fontWeight: 500, color: expanded === p.id ? C.primary : C.text }}>{p.name}</span>
+                <span onClick={e => { e.stopPropagation(); navigate(`/projects/${p.id}`); }}
+                  title="Карточка проекта"
+                  style={{ fontSize: 14, color: C.textMuted, cursor: 'pointer', padding: '0 2px', flexShrink: 0, opacity: .7 }}>⊞</span>
+              </div>
+
+              {expanded === p.id && (
+                <div style={{ paddingLeft: 14, paddingBottom: 4 }}>
+                  {loadingDetail
+                    ? <EmptyMsg>Загрузка...</EmptyMsg>
+                    : (<>
+                      {totals && totals.tasks_count > 0 && (
+                        <div style={{ margin: '6px 0', padding: '8px 10px', background: C.primaryBg, borderRadius: 6, fontSize: 11, border: `1px solid ${C.primary}22` }}>
+                          <div style={{ fontWeight: 600, color: C.primary, marginBottom: 4 }}>Итого ({totals.tasks_count} {totals.tasks_count === 1 ? 'смета' : 'сметы'})</div>
+                          <div style={{ color: C.textSec }}>Работы: <b>{fmt(totals.total_work)} ₽</b></div>
+                          <div style={{ color: C.textSec }}>Материалы: <b>{fmt(totals.total_mat)} ₽</b></div>
+                          <div style={{ color: C.text, fontWeight: 700, marginTop: 3 }}>С НДС: {fmt(totals.total + totals.total_vat)} ₽</div>
+                        </div>
+                      )}
+                      <button onClick={() => { setImportProjectId(p.id); importRef.current?.click(); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, width: '100%', padding: '5px 8px', margin: '4px 0', background: 'transparent', border: `1px dashed ${C.border}`, borderRadius: 5, cursor: 'pointer', fontSize: 12, color: C.textSec }}>
+                        ⬆ Импорт Excel
+                      </button>
+                      {!detail || detail.tasks.length === 0
+                        ? <EmptyMsg>Нет смет</EmptyMsg>
+                        : detail.tasks.map(t => (
+                          <TaskRow key={t.id} task={t}
+                            onNavigate={() => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`)}
+                            onDelete={async () => { if (confirm('Удалить смету?')) { await client.delete(`/tasks/${t.id}`); refreshDetail(p.id); } }}
+                          />
+                        ))}
+                    </>)}
+                </div>
               )}
             </div>
-          )}
-        </div>
-      ))}
+          ))}
+      </div>
       <input ref={importRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleImport} />
     </div>
   );
 }
 
-const newProjectBtn: React.CSSProperties = { width: '100%', padding: '7px 12px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13, marginBottom: 12 };
+function SideSection({ label, count, open, onToggle, accent, children }: {
+  label: string; count: number; open: boolean; onToggle: () => void; accent?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div onClick={onToggle} style={{
+        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+        borderRadius: 6, cursor: 'pointer', userSelect: 'none',
+        background: accent ? C.warningBg : C.surfaceAlt,
+        border: `1px solid ${accent ? C.warning + '40' : C.border}`,
+      }}>
+        <span style={{ fontSize: 10, color: accent ? C.warning : C.textMuted }}>{open ? '▼' : '▶'}</span>
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: accent ? C.warning : C.text }}>{label}</span>
+        {count > 0 && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 99, background: accent ? C.warning + '20' : C.border, color: accent ? C.warning : C.textSec, fontWeight: 600 }}>{count}</span>}
+      </div>
+      {open && <div style={{ paddingTop: 2 }}>{children}</div>}
+    </div>
+  );
+}
+
+function TaskRow({ task: t, onNavigate, onDelete, draggable }: { task: TaskRef; onNavigate: () => void; onDelete?: () => void; draggable?: boolean; }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, cursor: 'pointer', marginBottom: 1 }}
+      draggable={draggable}
+      onDragStart={draggable ? e => e.dataTransfer.setData('text/plain', t.id) : undefined}
+    >
+      {draggable && <span style={{ color: C.textMuted, fontSize: 10, cursor: 'grab' }}>⠿</span>}
+      <span onClick={onNavigate} style={{ flex: 1, fontSize: 12, color: C.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.name || TYPE_LABELS[t.task_type]}>
+        {t.name || TYPE_LABELS[t.task_type] || t.task_type}
+        {t.doc_type && <span style={{ marginLeft: 4, fontSize: 10, color: C.textMuted }}>[{t.doc_type}]</span>}
+      </span>
+      <span style={{ fontSize: 8, color: STATUS_COLOR[t.status] || C.textMuted, flexShrink: 0 }}>●</span>
+      {onDelete && (
+        <button onClick={e => { e.stopPropagation(); onDelete(); }}
+          style={{ padding: '1px 5px', fontSize: 10, background: 'transparent', color: C.textMuted, border: 'none', borderRadius: 3, cursor: 'pointer', flexShrink: 0, opacity: 0 }}
+          className="del-btn">✕</button>
+      )}
+    </div>
+  );
+}
+
+function EmptyMsg({ children }: { children: React.ReactNode }) {
+  return <p style={{ color: C.textMuted, fontSize: 12, margin: '4px 10px', fontStyle: 'italic' }}>{children}</p>;
+}
