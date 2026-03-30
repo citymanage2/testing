@@ -10,6 +10,7 @@ interface Item {
   id: string; position: number; section: string; type: string; name: string;
   unit: string; quantity: number; price_work: number; price_material: number;
   total: number; is_analogue: boolean; is_optimized: boolean; source_url?: string; comment?: string;
+  row_type?: string; sort_order?: number;
 }
 interface EstimateData { items: Item[]; vat_rate: number; total_work: number; total_mat: number; total: number; total_vat: number; estimate_status: string; }
 interface Project { id: string; name: string; }
@@ -58,6 +59,15 @@ export default function EstimateView() {
   const [sepIncludeWorks, setSepIncludeWorks] = useState(true);
   const [sepIncludeMaterials, setSepIncludeMaterials] = useState(true);
   const [sepTitle, setSepTitle] = useState('Разделительная ведомость');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [dragItemId, setDragItemId] = useState<string | null>(null);
+  const [showBatchSection, setShowBatchSection] = useState(false);
+  const [batchSectionTarget, setBatchSectionTarget] = useState('');
+  const [showBatchCoeff, setShowBatchCoeff] = useState(false);
+  const [batchCoeff, setBatchCoeff] = useState('1');
   const nameRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
@@ -83,7 +93,17 @@ export default function EstimateView() {
   useEffect(() => { load(); }, [id]);
   useEffect(() => { if (editingName && nameRef.current) nameRef.current.focus(); }, [editingName]);
 
-  const filtered = data ? data.items.filter(i => filterType === 'all' || (filterType === 'works' ? i.type === 'Работа' : i.type === 'Материал')) : [];
+  const filtered = data ? data.items.filter(i => {
+    if (filterType !== 'all' && i.row_type !== 'section_header') {
+      if (filterType === 'works' && i.type !== 'Работа') return false;
+      if (filterType === 'materials' && i.type !== 'Материал') return false;
+    }
+    if (searchQuery && i.row_type !== 'section_header') {
+      const q = searchQuery.toLowerCase();
+      if (!i.name.toLowerCase().includes(q) && !i.section.toLowerCase().includes(q) && !i.type.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  }) : [];
 
   function startEdit(item: Item, field: string) {
     setEditCell({ itemId: item.id, field });
@@ -199,6 +219,84 @@ export default function EstimateView() {
     setSavingExtras(false);
   }
 
+  async function addSection() {
+    const name = prompt('Название раздела:');
+    if (!name) return;
+    await client.post(`/projects/estimates/${id}/items`, {
+      section: '', type: 'Работа', name, unit: '', quantity: 0,
+      work_price: 0, mat_price: 0, row_type: 'section_header',
+    });
+    load();
+  }
+
+  async function batchDelete() {
+    if (!selectedIds.size || !confirm(`Удалить ${selectedIds.size} строк?`)) return;
+    await client.post(`/projects/estimates/${id}/items/batch-delete`, { item_ids: Array.from(selectedIds) });
+    setSelectedIds(new Set());
+    load();
+  }
+
+  async function batchMoveSection() {
+    await client.post(`/projects/estimates/${id}/items/batch-update`, { item_ids: Array.from(selectedIds), section: batchSectionTarget });
+    setSelectedIds(new Set());
+    setShowBatchSection(false);
+    load();
+  }
+
+  async function batchApplyCoeff() {
+    const c = parseFloat(batchCoeff);
+    if (isNaN(c) || c <= 0) return;
+    await client.post(`/projects/estimates/${id}/items/batch-update`, { item_ids: Array.from(selectedIds), coefficient: c });
+    setSelectedIds(new Set());
+    setShowBatchCoeff(false);
+    load();
+  }
+
+  function handleDragStart(e: React.DragEvent, itemId: string) {
+    setDragItemId(itemId);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function handleDragOver(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverId(targetId);
+  }
+
+  async function handleDrop(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    setDragOverId(null);
+    if (!dragItemId || dragItemId === targetId || !data) { setDragItemId(null); return; }
+    const items = [...data.items];
+    const fromIndex = items.findIndex(i => i.id === dragItemId);
+    const toIndex = items.findIndex(i => i.id === targetId);
+    if (fromIndex < 0 || toIndex < 0) { setDragItemId(null); return; }
+    const [moved] = items.splice(fromIndex, 1);
+    items.splice(toIndex, 0, moved);
+    const reorderData = items.map((item, idx) => ({ id: item.id, sort_order: idx * 1.0 }));
+    await client.post(`/projects/estimates/${id}/items/reorder`, { items: reorderData });
+    setDragItemId(null);
+    load();
+  }
+
+  function toggleSection(sectionKey: string) {
+    const next = new Set(collapsedSections);
+    if (next.has(sectionKey)) next.delete(sectionKey); else next.add(sectionKey);
+    setCollapsedSections(next);
+  }
+
+  function toggleSelect(itemId: string) {
+    const next = new Set(selectedIds);
+    if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
+    setSelectedIds(next);
+  }
+
+  function toggleSelectAll() {
+    const selectableIds = filtered.filter(i => i.row_type !== 'section_header').map(i => i.id);
+    if (selectedIds.size === selectableIds.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(selectableIds));
+  }
+
   async function downloadSepSheet() {
     const body: Record<string, unknown> = { include_works: sepIncludeWorks, include_materials: sepIncludeMaterials, title: sepTitle };
     if (sepManual) body.item_ids = Array.from(sepSelectedIds);
@@ -264,20 +362,66 @@ export default function EstimateView() {
       </div>
 
       {/* Filters & export */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>Фильтр:</span>
         {(['all', 'works', 'materials'] as const).map(t => (
           <button key={t} onClick={() => setFilterType(t)} style={{ padding: '4px 12px', borderRadius: 4, border: '1px solid #ccc', background: filterType === t ? '#1565c0' : '#fff', color: filterType === t ? '#fff' : '#333', cursor: 'pointer', fontSize: 13 }}>
             {{ all: 'Все', works: 'Работы', materials: 'Материалы' }[t]}
           </button>
         ))}
+        <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по строкам..." style={{ padding: '4px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 13, minWidth: 180 }} />
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
           <button onClick={() => exportEstimate('all')} style={btn('#2e7d32')}>⬇ Все</button>
           <button onClick={() => exportEstimate('works')} style={btn('#1565c0')}>⬇ Работы</button>
           <button onClick={() => exportEstimate('materials')} style={btn('#6a1b9a')}>⬇ Материалы</button>
+          <button onClick={addSection} style={btn('#546e7a')}>+ Раздел</button>
           <button onClick={() => setShowAddRow(true)} style={btn('#6a1b9a')}>+ Строка</button>
         </div>
       </div>
+
+      {/* Batch operations bar */}
+      {selectedIds.size > 0 && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, padding: '8px 12px', background: '#e3f2fd', borderRadius: 6, border: '1px solid #90caf9', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Выбрано: {selectedIds.size}</span>
+          <button onClick={batchDelete} style={btn('#d32f2f')}>Удалить выбранные</button>
+          <button onClick={() => { setBatchSectionTarget(''); setShowBatchSection(true); }} style={btn('#00796b')}>Переместить в раздел</button>
+          <button onClick={() => { setBatchCoeff('1'); setShowBatchCoeff(true); }} style={btn('#e65100')}>× Коэффициент</button>
+          <button onClick={() => setSelectedIds(new Set())} style={{ padding: '6px 12px', border: '1px solid #90caf9', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 13 }}>Снять выделение</button>
+        </div>
+      )}
+
+      {/* Batch move section modal */}
+      {showBatchSection && (
+        <div style={overlay}>
+          <div style={{ ...modal, maxWidth: 360 }}>
+            <h3 style={{ margin: '0 0 12px' }}>Переместить в раздел</h3>
+            <label style={lbl}>Название раздела
+              <input value={batchSectionTarget} onChange={e => setBatchSectionTarget(e.target.value)} style={inp} list="sections-list" />
+              <datalist id="sections-list">{allSections.map(s => <option key={s} value={s} />)}</datalist>
+            </label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button onClick={batchMoveSection} style={btn('#00796b')}>Переместить</button>
+              <button onClick={() => setShowBatchSection(false)} style={btn('#757575')}>Отмена</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch coefficient modal */}
+      {showBatchCoeff && (
+        <div style={overlay}>
+          <div style={{ ...modal, maxWidth: 360 }}>
+            <h3 style={{ margin: '0 0 12px' }}>Применить коэффициент</h3>
+            <label style={lbl}>Коэффициент (цены работ и материалов × K)
+              <input type="number" min="0.01" step="0.01" value={batchCoeff} onChange={e => setBatchCoeff(e.target.value)} style={inp} />
+            </label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button onClick={batchApplyCoeff} style={btn('#e65100')}>Применить</button>
+              <button onClick={() => setShowBatchCoeff(false)} style={btn('#757575')}>Отмена</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add row modal */}
       {showAddRow && (
@@ -317,48 +461,81 @@ export default function EstimateView() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#f5f5f5' }}>
+              <th style={{ padding: '8px 4px', border: '1px solid #e0e0e0', width: 28 }}>
+                <input type="checkbox" checked={selectedIds.size > 0 && selectedIds.size === filtered.filter(i => i.row_type !== 'section_header').length} onChange={toggleSelectAll} title="Выбрать все" />
+              </th>
+              <th style={{ padding: '8px 4px', border: '1px solid #e0e0e0', width: 20 }} title="Перетащить для перестановки">⠿</th>
               {['№', 'Раздел', 'Тип', 'Наименование', 'Ед.', 'Кол-во', 'Цена работ', 'Цена мат.', 'Стоимость', 'Источник', 'Комментарий', ''].map(h => (
                 <th key={h} style={{ padding: '8px 8px', textAlign: 'left', border: '1px solid #e0e0e0', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.map(item => {
-              const rowBg = item.is_optimized ? '#FFF3CD' : item.is_analogue ? '#C8E6C9' : undefined;
-              return (
-                <tr key={item.id} style={{ background: rowBg }}>
-                  <td style={td}>{item.position}</td>
-                  <td style={td}>{item.section}</td>
-                  <td style={td}>{item.type}</td>
-                  <td style={{ ...td, maxWidth: 280 }}>
-                    {item.name}
-                    {item.is_analogue && <span style={{ marginLeft: 6, padding: '1px 5px', background: '#4caf50', color: '#fff', borderRadius: 10, fontSize: 10 }}>аналог</span>}
-                    {item.is_optimized && <span style={{ marginLeft: 4, padding: '1px 5px', background: '#ff9800', color: '#fff', borderRadius: 10, fontSize: 10 }}>опт</span>}
-                  </td>
-                  <td style={td}>{item.unit}</td>
-                  <td style={{ ...td, minWidth: 60 }}>{editInput(item, 'quantity')}</td>
-                  <td style={{ ...td, minWidth: 80 }}>{editInput(item, 'work_price')}</td>
-                  <td style={{ ...td, minWidth: 80 }}>{editInput(item, 'mat_price')}</td>
-                  <td style={td}>{fmt(item.total)}</td>
-                  <td style={{ ...td, minWidth: 120 }}>
-                    {item.type === 'Материал' && (
-                      item.source_url
-                        ? <a href={item.source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#1565c0', wordBreak: 'break-all' }}>🔗 {item.source_url.replace(/^https?:\/\//, '').slice(0, 25)}…</a>
-                        : editInput(item, 'source_url')
-                    )}
-                  </td>
-                  <td style={{ ...td, minWidth: 120 }}>{editInput(item, 'comment')}</td>
-                  <td style={td}>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {item.type === 'Материал' && (
-                        <button onClick={() => setAnalogueItemId(item.id)} style={{ padding: '2px 8px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Аналоги</button>
-                      )}
-                      <button onClick={() => deleteItem(item.id)} style={{ padding: '2px 6px', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>✕</button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+            {(() => {
+              let currentSectionKey = '';
+              const rows: React.ReactNode[] = [];
+              filtered.forEach(item => {
+                if (item.row_type === 'section_header') {
+                  currentSectionKey = item.id;
+                  const isCollapsed = collapsedSections.has(item.id);
+                  rows.push(
+                    <tr key={item.id} draggable onDragStart={e => handleDragStart(e, item.id)} onDragOver={e => handleDragOver(e, item.id)} onDrop={e => handleDrop(e, item.id)} onDragLeave={() => setDragOverId(null)}
+                      style={{ background: dragOverId === item.id ? '#bbdefb' : '#e8eaf6', cursor: 'grab' }}>
+                      <td style={{ ...td, textAlign: 'center' }} />
+                      <td style={{ ...td, textAlign: 'center', color: '#9e9e9e', cursor: 'grab' }}>⠿</td>
+                      <td colSpan={11} style={{ ...td, fontWeight: 700, fontSize: 13, padding: '6px 10px' }}>
+                        <span onClick={() => toggleSection(item.id)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                          {isCollapsed ? '▶' : '▼'} {item.name}
+                        </span>
+                        <button onClick={() => deleteItem(item.id)} style={{ marginLeft: 8, padding: '1px 6px', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>✕</button>
+                      </td>
+                    </tr>
+                  );
+                } else {
+                  if (currentSectionKey && collapsedSections.has(currentSectionKey)) return;
+                  const rowBg = dragOverId === item.id ? '#bbdefb' : item.is_optimized ? '#FFF3CD' : item.is_analogue ? '#C8E6C9' : undefined;
+                  rows.push(
+                    <tr key={item.id} draggable onDragStart={e => handleDragStart(e, item.id)} onDragOver={e => handleDragOver(e, item.id)} onDrop={e => handleDrop(e, item.id)} onDragLeave={() => setDragOverId(null)}
+                      style={{ background: rowBg, outline: selectedIds.has(item.id) ? '2px solid #1976d2' : undefined }}>
+                      <td style={{ ...td, textAlign: 'center' }}>
+                        <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
+                      </td>
+                      <td style={{ ...td, textAlign: 'center', color: '#bbb', cursor: 'grab' }}>⠿</td>
+                      <td style={td}>{item.position}</td>
+                      <td style={td}>{item.section}</td>
+                      <td style={td}>{item.type}</td>
+                      <td style={{ ...td, maxWidth: 280 }}>
+                        {item.name}
+                        {item.is_analogue && <span style={{ marginLeft: 6, padding: '1px 5px', background: '#4caf50', color: '#fff', borderRadius: 10, fontSize: 10 }}>аналог</span>}
+                        {item.is_optimized && <span style={{ marginLeft: 4, padding: '1px 5px', background: '#ff9800', color: '#fff', borderRadius: 10, fontSize: 10 }}>опт</span>}
+                      </td>
+                      <td style={td}>{item.unit}</td>
+                      <td style={{ ...td, minWidth: 60 }}>{editInput(item, 'quantity')}</td>
+                      <td style={{ ...td, minWidth: 80 }}>{editInput(item, 'work_price')}</td>
+                      <td style={{ ...td, minWidth: 80 }}>{editInput(item, 'mat_price')}</td>
+                      <td style={td}>{fmt(item.total)}</td>
+                      <td style={{ ...td, minWidth: 120 }}>
+                        {item.type === 'Материал' && (
+                          item.source_url
+                            ? <a href={item.source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#1565c0', wordBreak: 'break-all' }}>🔗 {item.source_url.replace(/^https?:\/\//, '').slice(0, 25)}…</a>
+                            : editInput(item, 'source_url')
+                        )}
+                      </td>
+                      <td style={{ ...td, minWidth: 120 }}>{editInput(item, 'comment')}</td>
+                      <td style={td}>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {item.type === 'Материал' && (
+                            <button onClick={() => setAnalogueItemId(item.id)} style={{ padding: '2px 8px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Аналоги</button>
+                          )}
+                          <button onClick={() => deleteItem(item.id)} style={{ padding: '2px 6px', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>✕</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+              });
+              return rows;
+            })()}
           </tbody>
         </table>
       </div>

@@ -17,6 +17,8 @@ class EstimateItemSchema(BaseModel):
     is_optimized: bool
     source_url: Optional[str] = None
     comment: Optional[str] = None
+    row_type: str = "item"
+    sort_order: float = 0.0
 
     model_config = {"from_attributes": True}
 
@@ -28,6 +30,8 @@ class EstimateItemSchema(BaseModel):
             price_work=obj.work_price, price_material=obj.mat_price, total=obj.total,
             is_analogue=obj.is_analogue, is_optimized=obj.is_optimized,
             source_url=obj.source_url, comment=obj.comment,
+            row_type=getattr(obj, "row_type", "item"),
+            sort_order=getattr(obj, "sort_order", 0.0),
         )
 
 
@@ -40,6 +44,8 @@ class EstimateItemUpdate(BaseModel):
     mat_price: Optional[float] = None
     source_url: Optional[str] = None
     comment: Optional[str] = None
+    row_type: Optional[str] = None
+    sort_order: Optional[float] = None
 
 
 class KPRequestCreate(BaseModel):
@@ -131,3 +137,9 @@ class EstimateItemCreate(BaseModel):
     quantity: float = 1.0
     work_price: float = 0.0
     mat_price: float = 0.0
+    row_type: str = "item"
+    sort_order: Optional[float] = None
+
+
+class ReorderRequest(BaseModel):
+    items: list[dict]  # [{id: str, sort_order: float}]

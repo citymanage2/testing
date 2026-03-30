@@ -16,7 +16,7 @@ from app.schemas.estimate import (
     EstimateItemsResponse, EstimateItemSchema, EstimateItemUpdate, EstimateStatusUpdate,
     VersionResponse, OptimizeExecuteRequest, ApplyAnalogueRequest,
     MoveTaskRequest, ProjectTotals, PairCheckResult, KPRequestCreate,
-    TaskExtras, SeparationSheetRequest, EstimateItemCreate,
+    TaskExtras, SeparationSheetRequest, EstimateItemCreate, ReorderRequest,
 )
 
 router = APIRouter()
@@ -95,7 +95,7 @@ async def update_estimate_status(task_id: str, body: EstimateStatusUpdate, curre
 
 @router.get("/estimates/{task_id}/items", response_model=EstimateItemsResponse)
 async def get_estimate_items(task_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.position))
+    result = await db.execute(select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.sort_order, EstimateItem.position))
     items = result.scalars().all()
     total_work = sum(i.work_price * i.quantity for i in items)
     total_mat = sum(i.mat_price * i.quantity for i in items)
@@ -167,6 +167,8 @@ async def update_item(task_id: str, item_id: str, body: EstimateItemUpdate, curr
     if body.mat_price is not None: item.mat_price = body.mat_price
     if body.source_url is not None: item.source_url = body.source_url
     if body.comment is not None: item.comment = body.comment
+    if body.row_type is not None: item.row_type = body.row_type
+    if body.sort_order is not None: item.sort_order = body.sort_order
     item.total = (item.work_price + item.mat_price) * item.quantity
     await db.commit()
     return EstimateItemSchema.model_validate(item)
@@ -305,18 +307,72 @@ async def update_extras(task_id: str, body: TaskExtras, current_user: CurrentUse
 
 @router.post("/estimates/{task_id}/items", response_model=EstimateItemSchema, status_code=201)
 async def add_estimate_item(task_id: str, body: EstimateItemCreate, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
-    # get next position
-    existing = (await db.execute(select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.position.desc()).limit(1))).scalars().first()
+    existing = (await db.execute(select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.sort_order.desc(), EstimateItem.position.desc()).limit(1))).scalars().first()
     position = (existing.position + 1) if existing else 0
+    max_sort = (existing.sort_order + 1.0) if existing else 0.0
+    sort_order = body.sort_order if body.sort_order is not None else max_sort
     item = EstimateItem(
         id=str(uuid.uuid4()), task_id=task_id, position=position,
         section=body.section, type=body.type, name=body.name, unit=body.unit,
         quantity=body.quantity, work_price=body.work_price, mat_price=body.mat_price,
         total=(body.work_price + body.mat_price) * body.quantity,
+        row_type=body.row_type, sort_order=sort_order,
     )
     db.add(item)
     await db.commit()
     return EstimateItemSchema.model_validate(item)
+
+
+@router.post("/estimates/{task_id}/items/reorder")
+async def reorder_items(task_id: str, body: ReorderRequest, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    """Bulk update sort_order for drag-and-drop reordering."""
+    for entry in body.items:
+        item = await db.get(EstimateItem, entry["id"])
+        if item and item.task_id == task_id:
+            item.sort_order = float(entry["sort_order"])
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/estimates/{task_id}/sections")
+async def get_sections(task_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    """Return unique section names for this estimate (for autocomplete/dropdown)."""
+    result = await db.execute(
+        select(EstimateItem.section).where(EstimateItem.task_id == task_id).distinct()
+    )
+    sections = [row[0] for row in result.fetchall() if row[0]]
+    return {"sections": sections}
+
+
+@router.post("/estimates/{task_id}/items/batch-delete", status_code=204)
+async def batch_delete_items(task_id: str, body: dict, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    """Delete multiple items by id list."""
+    item_ids = body.get("item_ids", [])
+    for item_id in item_ids:
+        item = await db.get(EstimateItem, item_id)
+        if item and item.task_id == task_id:
+            await db.delete(item)
+    await db.commit()
+
+
+@router.post("/estimates/{task_id}/items/batch-update")
+async def batch_update_items(task_id: str, body: dict, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    """Batch update section or apply price coefficient to selected items."""
+    item_ids = body.get("item_ids", [])
+    new_section = body.get("section")
+    coefficient = body.get("coefficient")
+    for item_id in item_ids:
+        item = await db.get(EstimateItem, item_id)
+        if not item or item.task_id != task_id:
+            continue
+        if new_section is not None:
+            item.section = new_section
+        if coefficient is not None:
+            item.work_price = round(item.work_price * coefficient, 2)
+            item.mat_price = round(item.mat_price * coefficient, 2)
+            item.total = (item.work_price + item.mat_price) * item.quantity
+    await db.commit()
+    return {"ok": True}
 
 
 @router.delete("/estimates/{task_id}/items/{item_id}", status_code=204)

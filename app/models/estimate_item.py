@@ -23,3 +23,5 @@ class EstimateItem(Base):
     source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     original_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    row_type: Mapped[str] = mapped_column(String(16), default="item")
+    sort_order: Mapped[float] = mapped_column(default=0.0)
