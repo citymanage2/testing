@@ -121,6 +121,7 @@ export default function ProjectsSidebar() {
           >
             <span style={{ fontSize: 10, color: '#999' }}>{expanded === p.id ? '▼' : '▶'}</span>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.name}</span>
+            <span onClick={e => { e.stopPropagation(); navigate(`/projects/${p.id}`); }} title="Карточка проекта" style={{ fontSize: 12, color: '#90a4ae', cursor: 'pointer', padding: '0 2px' }}>⊞</span>
           </div>
           {expanded === p.id && (
             <div style={{ paddingLeft: 12 }}>

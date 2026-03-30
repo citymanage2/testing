@@ -10,6 +10,7 @@ import CompanySettings from './pages/CompanySettings';
 import Contractors from './pages/Contractors';
 import Catalog from './pages/Catalog';
 import RoomCalculator from './pages/RoomCalculator';
+import ProjectDetail from './pages/ProjectDetail';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/contractors" element={<Contractors />} />
             <Route path="/calculator" element={<RoomCalculator />} />
             <Route path="/settings/company" element={<CompanySettings />} />
+            <Route path="/projects/:id" element={<ProjectDetail />} />
           </Route>
         </Route>
         <Route element={<ProtectedRoute adminOnly />}>
