@@ -10,10 +10,11 @@ from app.models.price import PriceList, PriceWork, PriceMaterial
 from app.models.company import CompanySettings
 from app.models.contractor import Contractor
 from app.models.price_catalog import PriceCatalog
+from app.models.generated_document import GeneratedDocument
 
 __all__ = [
     "Base", "User", "Project", "Task", "TaskInputFile",
     "TaskResult", "EstimateItem", "TaskVersion",
     "PriceList", "PriceWork", "PriceMaterial",
-    "CompanySettings", "Contractor", "PriceCatalog",
+    "CompanySettings", "Contractor", "PriceCatalog", "GeneratedDocument",
 ]

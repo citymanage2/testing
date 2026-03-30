@@ -5,6 +5,7 @@ import StatusBadge from '../components/StatusBadge';
 import VersionHistoryDrawer from '../components/VersionHistoryDrawer';
 import OptimizationChecklist from '../components/OptimizationChecklist';
 import AnaloguePanel from '../components/AnaloguePanel';
+import DocumentGenerator from '../components/DocumentGenerator';
 
 interface Item {
   id: string; position: number; section: string; type: string; name: string;
@@ -706,6 +707,18 @@ export default function EstimateView() {
               <button onClick={() => setShowSepSheet(false)} style={btn('#757575')}>Отмена</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Document generation */}
+      {id && (
+        <div style={{ marginTop: 16 }}>
+          <details>
+            <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: '6px 0', color: '#1565c0', userSelect: 'none' }}>
+              📄 Формирование документов (Смета, КС-2, КС-3)
+            </summary>
+            <DocumentGenerator taskId={id} />
+          </details>
         </div>
       )}
 

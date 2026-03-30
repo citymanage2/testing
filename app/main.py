@@ -10,7 +10,7 @@ from app.models import Base
 from app.models.user import User
 from app.services.price_service import price_service
 from app.routers import auth, tasks, projects, admin, results
-from app.routers import company, contractors, catalog, calculator
+from app.routers import company, contractors, catalog, calculator, documents
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -58,6 +58,7 @@ app.include_router(company.router, prefix="/company", tags=["company"])
 app.include_router(contractors.router, prefix="/contractors", tags=["contractors"])
 app.include_router(catalog.router, prefix="/catalog", tags=["catalog"])
 app.include_router(calculator.router, prefix="/calculator", tags=["calculator"])
+app.include_router(documents.router, prefix="/projects", tags=["documents"])
 
 
 @app.get("/health")
