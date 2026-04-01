@@ -25,3 +25,5 @@ class EstimateItem(Base):
     original_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     row_type: Mapped[str] = mapped_column(String(16), default="item")
     sort_order: Mapped[float] = mapped_column(default=0.0)
+    sale_price: Mapped[float] = mapped_column(default=0.0)
+    position_code: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)

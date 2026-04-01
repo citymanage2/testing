@@ -2,6 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuthStore } from '../store/auth';
 import ProjectsSidebar from './ProjectsSidebar';
+import NotificationBell from './NotificationBell';
 import { C } from '../ui';
 
 const NAV_LINKS = [
@@ -61,6 +62,8 @@ export default function Layout() {
             </button>
           ))}
         </nav>
+
+        <NotificationBell />
 
         <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,.12)', margin: '0 4px' }} />
 

@@ -11,6 +11,7 @@ from app.models.user import User
 from app.services.price_service import price_service
 from app.routers import auth, tasks, projects, admin, results
 from app.routers import company, contractors, catalog, calculator, documents, project_card, work_acceptances, ai_assist
+from app.routers import project_lifecycle, project_docs, contracts, work_schedule, client_acts, purchase_requests, notifications
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -62,6 +63,13 @@ app.include_router(documents.router, prefix="/projects", tags=["documents"])
 app.include_router(project_card.router, prefix="/projects", tags=["project-card"])
 app.include_router(work_acceptances.router, prefix="/projects", tags=["work-acceptances"])
 app.include_router(ai_assist.router, prefix="/projects", tags=["ai-assist"])
+app.include_router(project_lifecycle.router, prefix="/projects", tags=["project-lifecycle"])
+app.include_router(project_docs.router, prefix="/projects", tags=["project-docs"])
+app.include_router(contracts.router, prefix="/projects", tags=["contracts"])
+app.include_router(work_schedule.router, prefix="/projects", tags=["work-schedule"])
+app.include_router(client_acts.router, prefix="/projects", tags=["client-acts"])
+app.include_router(purchase_requests.router, prefix="/projects", tags=["purchase-requests"])
+app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 
 
 @app.get("/health")

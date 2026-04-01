@@ -23,3 +23,10 @@ class Project(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    # Phase 5 additions
+    stage: Mapped[str] = mapped_column(String(32), default="LEAD")
+    construction_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    sales_manager_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    project_manager_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    contract_number: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    contract_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
