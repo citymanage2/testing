@@ -20,6 +20,10 @@ from app.models.work_schedule import WorkScheduleItem, WorkScheduleEntry
 from app.models.client_act import ClientKs2Act, ClientKs2ActItem
 from app.models.purchase_request import PurchaseRequest, PurchaseRequestItem
 from app.models.notification import Notification
+from app.models.warranty_claim import WarrantyClaim
+from app.models.contract_amendment import ContractAmendment
+from app.models.kp_request import KpRequest
+from app.models.estimate_item_log import EstimateItemLog
 
 __all__ = [
     "Base", "User", "Project", "Task", "TaskInputFile",
@@ -34,5 +38,6 @@ __all__ = [
     "ClientKs2Act", "ClientKs2ActItem",
     "PurchaseRequest", "PurchaseRequestItem",
     "Notification",
+    "WarrantyClaim", "ContractAmendment", "KpRequest", "EstimateItemLog",
 ]
 

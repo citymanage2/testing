@@ -12,6 +12,7 @@ from app.services.price_service import price_service
 from app.routers import auth, tasks, projects, admin, results
 from app.routers import company, contractors, catalog, calculator, documents, project_card, work_acceptances, ai_assist
 from app.routers import project_lifecycle, project_docs, contracts, work_schedule, client_acts, purchase_requests, notifications
+from app.routers import warranty, kp_requests
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -70,6 +71,8 @@ app.include_router(work_schedule.router, prefix="/projects", tags=["work-schedul
 app.include_router(client_acts.router, prefix="/projects", tags=["client-acts"])
 app.include_router(purchase_requests.router, prefix="/projects", tags=["purchase-requests"])
 app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+app.include_router(warranty.router, prefix="/projects", tags=["warranty"])
+app.include_router(kp_requests.router, prefix="/projects", tags=["kp-requests"])
 
 
 @app.get("/health")

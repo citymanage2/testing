@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import client from '../api/client';
-import { C, btnPrimary, btnOutline, btnDanger, badge, INPUT, LBL, CARD, TH, TD, OVERLAY, MODAL } from '../ui';
+import { C, btnPrimary, btnOutline, btnDanger, INPUT, LBL, CARD, TH, TD, OVERLAY, MODAL } from '../ui';
 
 interface KpRequest {
   id: string;
@@ -25,14 +25,6 @@ const STATUS_LABELS: Record<string, string> = {
   accepted: 'Принято',
   rejected: 'Отклонено',
 };
-
-function statusBadge(s: string) {
-  if (s === 'pending') return <span style={badge(C.textMuted, '#f1f5f9')}>{STATUS_LABELS[s]}</span>;
-  if (s === 'received') return <span style={badge(C.primary, C.primaryBg)}>{STATUS_LABELS[s]}</span>;
-  if (s === 'accepted') return <span style={badge(C.success, C.successBg)}>{STATUS_LABELS[s]}</span>;
-  if (s === 'rejected') return <span style={badge(C.danger, '#fef2f2')}>{STATUS_LABELS[s]}</span>;
-  return <span style={badge(C.textMuted, '#f1f5f9')}>{s}</span>;
-}
 
 const emptyForm = () => ({
   item_name: '',

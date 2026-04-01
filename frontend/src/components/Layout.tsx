@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/auth';
 import ProjectsSidebar from './ProjectsSidebar';
 import NotificationBell from './NotificationBell';
 import { C } from '../ui';
+import client from '../api/client';
 
 const NAV_LINKS = [
   { path: '/catalog',           icon: '📋', label: 'Каталог расценок' },
@@ -18,6 +19,20 @@ export default function Layout() {
   const logout     = useAuthStore((s) => s.logout);
   const isAdmin    = useAuthStore.getState().role === 'admin';
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const copyLogs = async () => {
+    try {
+      const r = await client.get('/notifications?limit=50');
+      const lines = r.data.map((n: {created_at: string; title: string; body: string}) =>
+        `[${new Date(n.created_at).toLocaleString('ru-RU')}] ${n.title}${n.body ? ': ' + n.body : ''}`
+      );
+      await navigator.clipboard.writeText(lines.join('\n'));
+      // Brief visual feedback
+      alert('Лог скопирован в буфер обмена');
+    } catch {
+      alert('Не удалось скопировать лог');
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: C.surfaceAlt }}>
@@ -107,6 +122,21 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      {/* Floating copy logs button */}
+      <button
+        onClick={copyLogs}
+        title="Скопировать лог активности"
+        style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 500,
+          width: 36, height: 36, borderRadius: '50%',
+          background: C.surface, border: `1px solid ${C.border}`,
+          boxShadow: '0 2px 8px rgba(0,0,0,.12)',
+          cursor: 'pointer', fontSize: 16,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        📋
+      </button>
     </div>
   );
 }

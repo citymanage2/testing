@@ -35,12 +35,7 @@ const ESTIMATE_STATUS_TRANSITIONS: Record<string, string[]> = {
   archived: [],
 };
 
-const ESTIMATE_STATUS_COLORS: Record<string, [string, string]> = {
-  draft: [C.textMuted, '#f1f5f9'],
-  internal_review: [C.warning, C.warningBg],
-  frozen: [C.primary, C.primaryBg],
-  archived: [C.textMuted, '#f1f5f9'],
-};
+
 const DOC_TYPES = ['Смета', 'ТЗ', 'Проект', 'Дефектная ведомость', 'Акт выполненных работ', 'КС-2', 'КС-3', 'Локальный сметный расчёт', 'Другое'];
 
 export default function EstimateView() {

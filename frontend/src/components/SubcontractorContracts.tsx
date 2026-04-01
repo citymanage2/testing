@@ -225,6 +225,41 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
                       </table>
                     </div>
                   )}
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>Доп. соглашения</span>
+                      <button style={btnGhost('sm')} onClick={() => loadAmendments(c.id)}>↻ Обновить</button>
+                    </div>
+                    {amendments[c.id] ? (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                        <thead>
+                          <tr>
+                            <th style={TH}>№ ДС</th>
+                            <th style={TH}>Описание</th>
+                            <th style={TH}>Δ Сумма</th>
+                            <th style={TH}>Статус</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {amendments[c.id].map(a => (
+                            <tr key={a.id}>
+                              <td style={TD}>{a.amendment_number}</td>
+                              <td style={TD}>{a.description || '—'}</td>
+                              <td style={{ ...TD, color: a.amount_delta >= 0 ? C.success : C.danger }}>
+                                {a.amount_delta >= 0 ? '+' : ''}{a.amount_delta.toLocaleString('ru-RU')} ₽
+                              </td>
+                              <td style={TD}>{a.status}</td>
+                            </tr>
+                          ))}
+                          {amendments[c.id].length === 0 && (
+                            <tr><td colSpan={4} style={{ ...TD, textAlign: 'center', color: C.textMuted }}>Нет ДС</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <button style={btnGhost('sm')} onClick={() => loadAmendments(c.id)}>Загрузить ДС</button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
