@@ -188,6 +188,8 @@ class PaymentIn(BaseModel):
     paid_at: date
     description: Optional[str] = None
     contractor_id: Optional[str] = None
+    due_date: Optional[date] = None
+    act_id: Optional[str] = None
 
 
 class PaymentOut(BaseModel):
@@ -199,18 +201,25 @@ class PaymentOut(BaseModel):
     contractor_id: Optional[str]
     contractor_name: Optional[str]
     created_at: datetime
+    due_date: Optional[date] = None
+    act_id: Optional[str] = None
+    is_overdue: bool = False
 
 
 @router.get("/{project_id}/payments", response_model=list[PaymentOut])
 async def list_payments(project_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rows = (await db.execute(select(ProjectPayment).where(ProjectPayment.project_id == project_id).order_by(ProjectPayment.paid_at.desc()))).scalars().all()
+    today = date.today()
     result = []
     for r in rows:
         cname = None
         if r.contractor_id:
             c = await db.get(Contractor, r.contractor_id)
             cname = c.name if c else None
-        result.append(PaymentOut(id=r.id, direction=r.direction, amount=float(r.amount), paid_at=r.paid_at, description=r.description, contractor_id=r.contractor_id, contractor_name=cname, created_at=r.created_at))
+        due_date = getattr(r, "due_date", None)
+        act_id = getattr(r, "act_id", None)
+        is_overdue = bool(due_date and due_date < today and r.direction == "income")
+        result.append(PaymentOut(id=r.id, direction=r.direction, amount=float(r.amount), paid_at=r.paid_at, description=r.description, contractor_id=r.contractor_id, contractor_name=cname, created_at=r.created_at, due_date=due_date, act_id=act_id, is_overdue=is_overdue))
     return result
 
 
@@ -230,6 +239,7 @@ async def add_payment(
         id=str(uuid.uuid4()), project_id=project_id, direction=body.direction,
         amount=Decimal(str(body.amount)), paid_at=body.paid_at,
         description=body.description, contractor_id=body.contractor_id, created_by=current_user.id,
+        due_date=body.due_date, act_id=body.act_id,
     )
     db.add(row)
     await db.commit()
@@ -238,7 +248,10 @@ async def add_payment(
     if row.contractor_id:
         c = await db.get(Contractor, row.contractor_id)
         cname = c.name if c else None
-    return PaymentOut(id=row.id, direction=row.direction, amount=float(row.amount), paid_at=row.paid_at, description=row.description, contractor_id=row.contractor_id, contractor_name=cname, created_at=row.created_at)
+    due_date = getattr(row, "due_date", None)
+    act_id = getattr(row, "act_id", None)
+    is_overdue = bool(due_date and due_date < date.today() and row.direction == "income")
+    return PaymentOut(id=row.id, direction=row.direction, amount=float(row.amount), paid_at=row.paid_at, description=row.description, contractor_id=row.contractor_id, contractor_name=cname, created_at=row.created_at, due_date=due_date, act_id=act_id, is_overdue=is_overdue)
 
 
 @router.delete("/{project_id}/payments/{payment_id}")

@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from pydantic import BaseModel
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -91,6 +93,68 @@ async def update_estimate_status(task_id: str, body: EstimateStatusUpdate, curre
     task.estimate_status_updated_by = body.updated_by
     await db.commit()
     return {"ok": True}
+
+
+class EstimateStatusLog(BaseModel):
+    status: str
+    reason: Optional[str] = None
+    user_name: Optional[str] = None
+    changed_at: Optional[datetime] = None
+
+
+@router.post("/estimates/{task_id}/status-log")
+async def add_estimate_status_log(
+    task_id: str,
+    body: EstimateStatusLog,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.estimate_item_log import EstimateItemLog
+    log = EstimateItemLog(
+        id=str(uuid.uuid4()),
+        task_id=task_id,
+        item_id=None,
+        user_id=current_user.id,
+        action="status_change",
+        field_name="estimate_status",
+        old_value=None,
+        new_value=body.status + (f" | {body.reason}" if body.reason else ""),
+        changed_at=body.changed_at or datetime.now(timezone.utc),
+    )
+    db.add(log)
+    # Also update task status
+    task = await db.get(Task, task_id)
+    if task:
+        task.estimate_status = body.status
+        task.estimate_status_updated_at = datetime.now(timezone.utc)
+        task.estimate_status_updated_by = body.user_name or current_user.id
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/estimates/{task_id}/status-log")
+async def get_estimate_status_log(
+    task_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.estimate_item_log import EstimateItemLog
+    result = await db.execute(
+        select(EstimateItemLog).where(
+            EstimateItemLog.task_id == task_id,
+            EstimateItemLog.action == "status_change"
+        ).order_by(EstimateItemLog.changed_at.desc())
+    )
+    logs = result.scalars().all()
+    return [
+        {
+            "id": l.id,
+            "new_value": l.new_value,
+            "changed_at": l.changed_at,
+            "user_id": l.user_id,
+        }
+        for l in logs
+    ]
 
 
 @router.get("/estimates/{task_id}/items", response_model=EstimateItemsResponse)
