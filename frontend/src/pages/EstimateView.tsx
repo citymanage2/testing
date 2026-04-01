@@ -22,11 +22,25 @@ interface PairResult { ok: boolean; materials_without_work: string[]; works_with
 interface TaskExtras { overhead_pct: number; overhead_sum: number; transport_pct: number; transport_sum: number; contingency_pct: number; contingency_sum: number; }
 
 const ESTIMATE_STATUSES = [
-  { value: 'created', label: 'Создана' },
-  { value: 'calculated', label: 'Рассчитана себестоимость' },
-  { value: 'optimized', label: 'Оптимизирована' },
-  { value: 'ready', label: 'Готова к подаче' },
+  { value: 'draft', label: 'Черновик' },
+  { value: 'internal_review', label: 'Внутреннее согласование' },
+  { value: 'frozen', label: 'Заморожена' },
+  { value: 'archived', label: 'В архиве' },
 ];
+
+const ESTIMATE_STATUS_TRANSITIONS: Record<string, string[]> = {
+  draft: ['internal_review'],
+  internal_review: ['draft', 'frozen'],
+  frozen: ['internal_review', 'archived'],
+  archived: [],
+};
+
+const ESTIMATE_STATUS_COLORS: Record<string, [string, string]> = {
+  draft: [C.textMuted, '#f1f5f9'],
+  internal_review: [C.warning, C.warningBg],
+  frozen: [C.primary, C.primaryBg],
+  archived: [C.textMuted, '#f1f5f9'],
+};
 const DOC_TYPES = ['Смета', 'ТЗ', 'Проект', 'Дефектная ведомость', 'Акт выполненных работ', 'КС-2', 'КС-3', 'Локальный сметный расчёт', 'Другое'];
 
 export default function EstimateView() {
@@ -190,6 +204,18 @@ export default function EstimateView() {
     setEstimateStatus(val);
     await client.patch(`/projects/estimates/${id}/status`, { status: val });
   }
+
+  const changeEstimateStatus = async (newStatus: string) => {
+    try {
+      await client.post(`/projects/estimates/${id}/status-log`, {
+        status: newStatus,
+        reason: '',
+      });
+      setEstimateStatus(newStatus);
+    } catch {
+      alert('Ошибка смены статуса сметы');
+    }
+  };
 
   async function saveDocType(val: string) {
     setDocType(val);
@@ -362,6 +388,14 @@ export default function EstimateView() {
                 <option value="">— статус —</option>
                 {ESTIMATE_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
+              {ESTIMATE_STATUS_TRANSITIONS[estimateStatus]?.map(next => {
+                const s = ESTIMATE_STATUSES.find(s => s.value === next);
+                return (
+                  <button key={next} style={btnOutline('sm')} onClick={() => changeEstimateStatus(next)}>
+                    → {s?.label}
+                  </button>
+                );
+              })}
               <select value={docType} onChange={e => saveDocType(e.target.value)}
                 style={{ ...INPUT, width: 'auto', fontSize: 12, padding: '3px 8px' }}>
                 <option value="">— тип документа —</option>

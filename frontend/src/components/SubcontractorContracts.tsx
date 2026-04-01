@@ -28,6 +28,17 @@ interface ContractItem {
   notes: string;
 }
 
+interface Amendment {
+  id: string;
+  contract_id: string;
+  amendment_number: string;
+  description?: string;
+  amount_delta: number;
+  status: string;
+  signed_at?: string;
+  created_at: string;
+}
+
 const STATUS_LABELS: Record<string, string> = { draft: 'Черновик', approval: 'На согласовании', signed: 'Подписан' };
 
 function statusBadge(s: string) {
@@ -48,6 +59,7 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [itemsMap, setItemsMap] = useState<Record<string, ContractItem[]>>({});
+  const [amendments, setAmendments] = useState<Record<string, Amendment[]>>({});
   const [loading, setLoading] = useState(false);
 
   // contract modal
@@ -76,6 +88,11 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
   const loadItems = async (contractId: string) => {
     const r = await client.get(`/projects/${projectId}/contracts/${contractId}/items`);
     setItemsMap(m => ({ ...m, [contractId]: r.data }));
+  };
+
+  const loadAmendments = async (contractId: string) => {
+    const r = await client.get(`/projects/${projectId}/contracts/${contractId}/amendments`);
+    setAmendments(a => ({ ...a, [contractId]: r.data }));
   };
 
   const toggleExpand = (id: string) => {

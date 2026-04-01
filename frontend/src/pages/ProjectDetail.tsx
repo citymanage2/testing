@@ -6,6 +6,8 @@ import SubcontractorContracts from '../components/SubcontractorContracts';
 import WorkSchedule from '../components/WorkSchedule';
 import ClientActsManager from '../components/ClientActsManager';
 import PurchaseRequests from '../components/PurchaseRequests';
+import WarrantyClaims from '../components/WarrantyClaims';
+import KpRequests from '../components/KpRequests';
 import { C, btnPrimary, btnOutline, btnDanger, btnGhost, INPUT, LBL, CARD, TH, TD, OVERLAY, MODAL } from '../ui';
 
 interface CardData {
@@ -32,7 +34,7 @@ const STAGE_COLORS: Record<string, string> = {
   WARRANTY: '#b45309', CLOSED: C.textMuted,
 };
 const CONSTRUCTION_TYPES = ['Новое строительство', 'Реконструкция', 'Ремонт', 'Прочее'];
-type TabType = 'info' | 'docs' | 'contracts' | 'schedule' | 'acts' | 'purchases' | 'gallery' | 'finance' | 'estimates';
+type TabType = 'info' | 'docs' | 'contracts' | 'schedule' | 'acts' | 'purchases' | 'gallery' | 'finance' | 'estimates' | 'warranty' | 'kp';
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -54,6 +56,7 @@ export default function ProjectDetail() {
   const [showStageModal, setShowStageModal] = useState(false);
   const [stageReason, setStageReason] = useState('');
   const [pendingStage, setPendingStage] = useState('');
+  const [suggestions, setSuggestions] = useState<{stage: string; label: string; ready: boolean; condition_hint: string}[]>([]);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   async function loadAll() {
@@ -76,6 +79,8 @@ export default function ProjectDetail() {
         const stageR = await client.get<StageInfo>(`/projects/${id}/stage`);
         setStageInfo(stageR.data);
       } catch {}
+      // Load stage suggestions
+      client.get(`/projects/${id}/stage-suggestions`).then(r => setSuggestions(r.data.suggestions)).catch(() => {});
     } catch { navigate('/task/create'); }
   }
 
@@ -126,11 +131,14 @@ export default function ProjectDetail() {
 
   const clientContractors = contractors.filter(c => c.kind === 'client');
   const stageBg = STAGE_COLORS[stageInfo?.stage || card.stage || 'LEAD'];
+  const currentStage = stageInfo?.stage || card.stage || '';
   const TABS: [TabType, string][] = [
     ['info', '📋 Информация'], ['docs', '📁 Документы'], ['contracts', '📄 Договоры'],
     ['schedule', '📅 ГПР'], ['acts', '✅ Акты КС-2'], ['purchases', '🛒 Закупки'],
     ['gallery', `🖼 Фото (${card.gallery_count})`], ['finance', '💰 Финансы'],
     ['estimates', `📐 Сметы (${tasks.length})`],
+    ['kp', '📊 Оптимизация КП'],
+    ...((currentStage === 'WARRANTY' || currentStage === 'CLOSED') ? [['warranty', '🛡 Гарантия'] as [TabType, string]] : []),
   ];
 
   return (
@@ -157,11 +165,19 @@ export default function ProjectDetail() {
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {/* Stage transition buttons */}
-            {stageInfo && stageInfo.allowed_next_stages.map(ns => (
-              <button key={ns.stage} onClick={() => { setPendingStage(ns.stage); setShowStageModal(true); }} style={btnOutline('sm')}>
-                → {ns.label}
-              </button>
-            ))}
+            {stageInfo?.allowed_next_stages.map(s => {
+              const hint = suggestions.find(sg => sg.stage === s.stage);
+              return (
+                <button
+                  key={s.stage}
+                  style={{...btnOutline('sm'), opacity: hint && !hint.ready ? 0.6 : 1}}
+                  title={hint?.condition_hint}
+                  onClick={() => { setPendingStage(s.stage); setShowStageModal(true); }}
+                >
+                  {hint && hint.ready ? '✅' : hint ? '⚠️' : ''} {s.label}
+                </button>
+              );
+            })}
             {editing ? (
               <>
                 <button onClick={saveCard} disabled={saving} style={btnPrimary('sm')}>{saving ? 'Сохранение...' : 'Сохранить'}</button>
@@ -247,6 +263,8 @@ export default function ProjectDetail() {
       {tab === 'schedule' && id && <WorkSchedule projectId={id} />}
       {tab === 'acts' && id && <ClientActsManager projectId={id} />}
       {tab === 'purchases' && id && <PurchaseRequests projectId={id} />}
+      {tab === 'warranty' && <WarrantyClaims projectId={id!} />}
+      {tab === 'kp' && <KpRequests projectId={id!} />}
 
       {tab === 'gallery' && (
         <div>
