@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.project import Project
 from app.models.subcontractor_contract import SubcontractorContract, SubcontractorContractItem
 from app.models.estimate_item import EstimateItem
+from app.models.contract_amendment import ContractAmendment
 
 router = APIRouter()
 

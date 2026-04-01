@@ -3,12 +3,15 @@ from datetime import datetime, timezone, date
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from pydantic import BaseModel
 
 from app.auth import get_current_user, CurrentUser
 from app.database import get_db
 from app.models.project import Project
+from app.models.task import Task
+from app.models.estimate_item import EstimateItem
+from app.models.client_act import ClientKs2Act
 
 router = APIRouter()
 
@@ -37,6 +40,32 @@ ALLOWED_TRANSITIONS: dict[str, list[str]] = {
     "WARRANTY": ["CLOSED"],
     "CLOSED": [],
 }
+
+
+async def _check_transition_conditions(project, to_stage: str, db: AsyncSession) -> Optional[str]:
+    """Returns error message if condition not met, None if OK."""
+    if to_stage == "ESTIMATION":
+        return None  # always allowed
+    if to_stage in ("OPTIMIZATION", "APPROVAL"):
+        # Need at least one frozen estimate
+        tasks_r = await db.execute(select(Task).where(Task.project_id == project.id))
+        tasks = tasks_r.scalars().all()
+        frozen = [t for t in tasks if t.estimate_status == "frozen"]
+        if not frozen:
+            return "Для перехода необходима хотя бы одна замороженная смета"
+    if to_stage == "EXECUTION":
+        if not getattr(project, "project_manager_id", None):
+            return "Назначьте руководителя проекта перед переходом в Реализацию"
+    if to_stage == "HANDOVER":
+        acts_r = await db.execute(
+            select(ClientKs2Act).where(
+                ClientKs2Act.project_id == project.id,
+                ClientKs2Act.status == "signed"
+            )
+        )
+        if not acts_r.scalars().first():
+            return "Для сдачи объекта необходим хотя бы один подписанный акт КС-2"
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -169,11 +198,32 @@ async def update_project_stage(
                    f"Allowed: {allowed}",
         )
 
+    condition_error = await _check_transition_conditions(project, body.stage, db)
+    if condition_error:
+        raise HTTPException(status_code=400, detail=condition_error)
+
     if hasattr(project, "stage"):
         project.stage = body.stage
     project.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(project)
+
+    # Notify project manager if assigned
+    pm_id = getattr(project, "project_manager_id", None)
+    if pm_id and pm_id != current_user.id:
+        from app.models.notification import Notification
+        notif = Notification(
+            id=str(uuid.uuid4()),
+            user_id=pm_id,
+            type="stage_change",
+            title=f"Проект перешёл на стадию: {STAGE_LABELS.get(body.stage, body.stage)}",
+            body=body.reason or "",
+            reference_type="project",
+            reference_id=project_id,
+        )
+        db.add(notif)
+        await db.commit()
+
     return _stage_response(project)
 
 
@@ -239,3 +289,28 @@ async def get_project_timeline(
         current_stage_label=STAGE_LABELS.get(stage) if stage else None,
         history=history,
     )
+
+
+@router.get("/{project_id}/stage-suggestions")
+async def get_stage_suggestions(
+    project_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns suggested next stages with readiness info."""
+    project = await db.get(Project, project_id)
+    if not project or project.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    current_stage = getattr(project, "stage", "LEAD") or "LEAD"
+    allowed = ALLOWED_TRANSITIONS.get(current_stage, [])
+    suggestions = []
+    for stage in allowed:
+        error = await _check_transition_conditions(project, stage, db)
+        suggestions.append({
+            "stage": stage,
+            "label": STAGE_LABELS.get(stage, stage),
+            "ready": error is None,
+            "condition_hint": error or "Условия выполнены",
+        })
+    return {"current_stage": current_stage, "suggestions": suggestions}
