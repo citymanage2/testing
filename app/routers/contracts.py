@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone, date
 from typing import Optional, List
+
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -357,4 +358,107 @@ async def delete_contract_item(
         raise HTTPException(status_code=404, detail="Item not found")
 
     await db.delete(item)
+    await db.commit()
+
+
+# ── Contract Amendments ──────────────────────────────────────────────────────
+
+class AmendmentCreate(BaseModel):
+    amendment_number: str
+    description: Optional[str] = None
+    amount_delta: float = 0.0
+    status: str = "draft"
+    signed_at: Optional[date] = None
+
+
+class AmendmentPatch(BaseModel):
+    amendment_number: Optional[str] = None
+    description: Optional[str] = None
+    amount_delta: Optional[float] = None
+    status: Optional[str] = None
+    signed_at: Optional[date] = None
+
+
+class AmendmentOut(BaseModel):
+    id: str
+    contract_id: str
+    amendment_number: str
+    description: Optional[str]
+    amount_delta: float
+    status: str
+    signed_at: Optional[date]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/{project_id}/contracts/{contract_id}/amendments", response_model=List[AmendmentOut])
+async def list_amendments(
+    project_id: str,
+    contract_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_project_owned(project_id, current_user.id, db)
+    result = await db.execute(
+        select(ContractAmendment).where(ContractAmendment.contract_id == contract_id)
+        .order_by(ContractAmendment.created_at)
+    )
+    return result.scalars().all()
+
+
+@router.post("/{project_id}/contracts/{contract_id}/amendments", response_model=AmendmentOut, status_code=201)
+async def create_amendment(
+    project_id: str,
+    contract_id: str,
+    body: AmendmentCreate,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_project_owned(project_id, current_user.id, db)
+    amendment = ContractAmendment(
+        id=str(uuid.uuid4()),
+        contract_id=contract_id,
+        **body.model_dump(),
+    )
+    db.add(amendment)
+    await db.commit()
+    await db.refresh(amendment)
+    return amendment
+
+
+@router.patch("/{project_id}/contracts/{contract_id}/amendments/{amendment_id}", response_model=AmendmentOut)
+async def update_amendment(
+    project_id: str,
+    contract_id: str,
+    amendment_id: str,
+    body: AmendmentPatch,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_project_owned(project_id, current_user.id, db)
+    amendment = await db.get(ContractAmendment, amendment_id)
+    if not amendment or amendment.contract_id != contract_id:
+        raise HTTPException(status_code=404, detail="Amendment not found")
+    for k, v in body.model_dump(exclude_none=True).items():
+        setattr(amendment, k, v)
+    await db.commit()
+    await db.refresh(amendment)
+    return amendment
+
+
+@router.delete("/{project_id}/contracts/{contract_id}/amendments/{amendment_id}", status_code=204)
+async def delete_amendment(
+    project_id: str,
+    contract_id: str,
+    amendment_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_project_owned(project_id, current_user.id, db)
+    amendment = await db.get(ContractAmendment, amendment_id)
+    if not amendment or amendment.contract_id != contract_id:
+        raise HTTPException(status_code=404, detail="Amendment not found")
+    await db.delete(amendment)
     await db.commit()
