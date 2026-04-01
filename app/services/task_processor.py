@@ -128,18 +128,18 @@ class TaskProcessor:
                     },
                 })
             else:
-                # For non-image files, include as document if supported, else as text description
-                try:
+                # Anthropic API only accepts application/pdf as document type
+                if f.mime_type == "application/pdf":
                     parts.append({
                         "type": "document",
                         "source": {
                             "type": "base64",
-                            "media_type": f.mime_type,
+                            "media_type": "application/pdf",
                             "data": base64.standard_b64encode(f.file_data).decode(),
                         },
                     })
-                except Exception:
-                    parts.append({"type": "text", "text": f"[Файл: {f.file_name}]"})
+                else:
+                    parts.append({"type": "text", "text": f"[Файл: {f.file_name}, тип: {f.mime_type}]"})
 
         prompt_text = task.user_prompt or "Выполни задачу."
         parts.append({"type": "text", "text": prompt_text})
