@@ -17,4 +17,7 @@ class ProjectPayment(Base):
     description: Mapped[str | None] = mapped_column(String(512), nullable=True)
     contractor_id: Mapped[str | None] = mapped_column(String, nullable=True)
     created_by: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    act_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    is_overdue: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

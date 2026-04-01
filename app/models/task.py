@@ -43,5 +43,7 @@ class Task(Base):
     estimate_status_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     estimate_status_updated_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     extras: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    estimate_type: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, default="main")
+    is_approved: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
