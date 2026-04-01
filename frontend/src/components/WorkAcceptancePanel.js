@@ -189,7 +189,7 @@ export default function WorkAcceptancePanel({ taskId, items }) {
     async function saveAccItems(accId) {
         setSavingItems(accId);
         try {
-            await client.put(`${base}/acceptances/${accId}/items`, { items: accItems[accId] ?? [] });
+            await client.put(`${base}/acceptances/${accId}/items`, accItems[accId] ?? []);
             // Refresh acceptances to update totals
             const { data } = await client.get(`${base}/acceptances`);
             setAcceptances(data);
