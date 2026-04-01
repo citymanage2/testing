@@ -31,12 +31,13 @@ interface ActItem {
 }
 
 interface SummaryItem {
-  id: string;
+  estimate_item_id: string;
   name: string;
   unit: string;
-  total_qty: number;
-  actioned_qty: number;
-  remaining_qty: number;
+  quantity_total: number;
+  quantity_actioned: number;
+  quantity_remaining: number;
+  pct_actioned: number;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -133,14 +134,14 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
     const summaryItems: SummaryItem[] = r.data;
     const existing: ActItem[] = itemsMap[act.id] ?? [];
     const items: ActItem[] = summaryItems.map(si => {
-      const ex = existing.find(e => e.estimate_item_id === si.id);
+      const ex = existing.find(e => e.estimate_item_id === si.estimate_item_id);
       return {
-        estimate_item_id: si.id,
+        estimate_item_id: si.estimate_item_id,
         name: si.name,
         unit: si.unit,
-        total_qty: si.total_qty,
-        already_actioned: si.actioned_qty - (ex ? Number(ex.quantity_presented) : 0),
-        remaining: si.remaining_qty + (ex ? Number(ex.quantity_presented) : 0),
+        total_qty: si.quantity_total,
+        already_actioned: si.quantity_actioned - (ex ? Number(ex.quantity_presented) : 0),
+        remaining: si.quantity_remaining + (ex ? Number(ex.quantity_presented) : 0),
         quantity_presented: ex ? ex.quantity_presented : 0,
         unit_price: ex ? ex.unit_price : 0,
       };
@@ -286,14 +287,14 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
             </thead>
             <tbody>
               {summary.map(it => {
-                const p = pct(it.actioned_qty, it.total_qty);
+                const p = pct(it.quantity_actioned, it.quantity_total);
                 return (
-                  <tr key={it.id}>
+                  <tr key={it.estimate_item_id}>
                     <td style={TD}>{it.name}</td>
                     <td style={TD}>{it.unit}</td>
-                    <td style={TD}>{it.total_qty}</td>
-                    <td style={TD}>{it.actioned_qty}</td>
-                    <td style={{ ...TD, color: it.remaining_qty < 0 ? C.danger : C.text }}>{it.remaining_qty}</td>
+                    <td style={TD}>{it.quantity_total}</td>
+                    <td style={TD}>{it.quantity_actioned}</td>
+                    <td style={{ ...TD, color: it.quantity_remaining < 0 ? C.danger : C.text }}>{it.quantity_remaining}</td>
                     <td style={TD}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ flex: 1, height: 8, background: C.border, borderRadius: 4, overflow: 'hidden' }}>
