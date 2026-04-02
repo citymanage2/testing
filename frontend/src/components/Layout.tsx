@@ -23,11 +23,24 @@ export default function Layout() {
   const copyLogs = async () => {
     try {
       const r = await client.get('/notifications?limit=50');
-      const lines = r.data.map((n: {created_at: string; title: string; body: string}) =>
+      const lines = (r.data as {created_at: string; title: string; body?: string}[]).map(n =>
         `[${new Date(n.created_at).toLocaleString('ru-RU')}] ${n.title}${n.body ? ': ' + n.body : ''}`
       );
-      await navigator.clipboard.writeText(lines.join('\n'));
-      // Brief visual feedback
+      const text = lines.length ? lines.join('\n') : '(нет записей)';
+      // Try modern clipboard API first, fall back to execCommand
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
       alert('Лог скопирован в буфер обмена');
     } catch {
       alert('Не удалось скопировать лог');

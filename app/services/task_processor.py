@@ -145,7 +145,24 @@ class TaskProcessor:
         parts.append({"type": "text", "text": prompt_text})
 
         # Full conversation: previous history + current request
-        messages = list(task.chat_history) if task.chat_history else []
+        # Sanitize history: remove document blocks with non-PDF media_type (legacy data)
+        def _sanitize_content(content):
+            if isinstance(content, list):
+                sanitized = []
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "document":
+                        mt = block.get("source", {}).get("media_type", "")
+                        if mt != "application/pdf":
+                            continue  # drop non-PDF document blocks
+                    sanitized.append(block)
+                return sanitized or content
+            return content
+
+        raw_history = list(task.chat_history) if task.chat_history else []
+        messages = [
+            {**msg, "content": _sanitize_content(msg.get("content", ""))}
+            for msg in raw_history
+        ]
         if not messages:
             messages.append({"role": "user", "content": parts if len(parts) > 1 else parts[0] if parts else prompt_text})
         else:
