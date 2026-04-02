@@ -19,7 +19,9 @@ const TYPE_LABELS: Record<string, string> = {
 
 const STATUS_COLOR: Record<string, string> = { completed: C.success, failed: C.danger, processing: C.warning };
 
-export default function ProjectsSidebar() {
+interface Props { collapsed?: boolean; }
+
+export default function ProjectsSidebar({ collapsed }: Props = {}) {
   const [projects,        setProjects]        = useState<Project[]>([]);
   const [expanded,        setExpanded]        = useState<string | null>(null);
   const [detail,          setDetail]          = useState<ProjectDetail | null>(null);
@@ -83,6 +85,25 @@ export default function ProjectsSidebar() {
   async function addProject() {
     const n = prompt('Название проекта:');
     if (n?.trim()) { await client.post('/projects', { name: n.trim() }); load(); }
+  }
+
+  if (collapsed) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4, gap: 2 }}>
+        {projects.map(p => (
+          <button
+            key={p.id}
+            onClick={() => navigate(`/projects/${p.id}`)}
+            title={p.name}
+            style={{
+              width: 40, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', borderRadius: 6,
+              cursor: 'pointer', fontSize: 18,
+            }}
+          >📁</button>
+        ))}
+      </div>
+    );
   }
 
   return (

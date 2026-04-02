@@ -244,13 +244,20 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
                   </div>
 
                   {expanded[act.id] && (
-                    <div style={{ borderTop: `1px solid ${C.border}`, padding: '12px 16px', overflowX: 'auto' }}>
+                    <div style={{ borderTop: `1px solid ${C.border}`, padding: '12px 16px' }}>
                       {!itemsMap[act.id] ? (
                         <div style={{ color: C.textMuted, fontSize: 13 }}>Загрузка...</div>
                       ) : itemsMap[act.id].length === 0 ? (
                         <div style={{ color: C.textMuted, fontSize: 13 }}>Нет позиций</div>
                       ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                          <colgroup>
+                            <col />
+                            <col style={{ width: 52 }} />
+                            <col style={{ width: 80 }} />
+                            <col style={{ width: 100 }} />
+                            <col style={{ width: 110 }} />
+                          </colgroup>
                           <thead>
                             <tr>
                               <th style={TH}>Наименование</th>
@@ -283,8 +290,16 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
       )}
 
       {tab === 'summary' && (
-        <div style={{ ...CARD, padding: 0, overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ ...CARD, padding: 0, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <colgroup>
+              <col />
+              <col style={{ width: 52 }} />
+              <col style={{ width: 80 }} />
+              <col style={{ width: 90 }} />
+              <col style={{ width: 80 }} />
+              <col style={{ width: 140 }} />
+            </colgroup>
             <thead>
               <tr>
                 <th style={TH}>Наименование</th>
@@ -292,7 +307,7 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
                 <th style={TH}>По смете</th>
                 <th style={TH}>Актировано</th>
                 <th style={TH}>Остаток</th>
-                <th style={{ ...TH, minWidth: 160 }}>%</th>
+                <th style={TH}>%</th>
               </tr>
             </thead>
             <tbody>
@@ -369,8 +384,17 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
             <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>
               Позиции акта № {itemsModal.act_number}
             </h3>
-            <div style={{ overflowX: 'auto', marginBottom: 12 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ marginBottom: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col />
+                  <col style={{ width: 52 }} />
+                  <col style={{ width: 80 }} />
+                  <col style={{ width: 90 }} />
+                  <col style={{ width: 80 }} />
+                  <col style={{ width: 90 }} />
+                  <col style={{ width: 90 }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th style={TH}>Наименование</th>

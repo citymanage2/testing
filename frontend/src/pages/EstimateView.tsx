@@ -584,15 +584,26 @@ export default function EstimateView() {
       </div>
 
       {/* Table */}
-      <div style={{ overflowX: 'auto', marginBottom: 20, borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+      <div style={{ marginBottom: 20, borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: 28 }} />
+            <col style={{ width: 36 }} />
+            <col style={{ width: 56 }} />
+            <col />
+            <col style={{ width: 44 }} />
+            <col style={{ width: 66 }} />
+            <col style={{ width: 82 }} />
+            <col style={{ width: 82 }} />
+            <col style={{ width: 90 }} />
+            <col style={{ width: 60 }} />
+          </colgroup>
           <thead>
             <tr>
               <th style={{ ...TH, width: 28, textAlign: 'center', padding: '8px 4px' }}>
                 <input type="checkbox" checked={selectedIds.size > 0 && selectedIds.size === filtered.filter(i => i.row_type !== 'section_header').length} onChange={toggleSelectAll} title="Выбрать все" />
               </th>
-              <th style={{ ...TH, width: 20, textAlign: 'center', padding: '8px 4px' }} title="Перетащить для перестановки">⠿</th>
-              {['№', 'Раздел', 'Тип', 'Наименование', 'Ед.', 'Кол-во', 'Цена работ', 'Цена мат.', 'Стоимость', 'Источник', 'Комментарий', ''].map(h => (
+              {['№', 'Тип', 'Наименование', 'Ед.', 'Кол-во', 'Цена р.', 'Цена м.', 'Стоимость', ''].map(h => (
                 <th key={h} style={TH}>{h}</th>
               ))}
             </tr>
@@ -609,8 +620,7 @@ export default function EstimateView() {
                     <tr key={item.id} draggable onDragStart={e => handleDragStart(e, item.id)} onDragOver={e => handleDragOver(e, item.id)} onDrop={e => handleDrop(e, item.id)} onDragLeave={() => setDragOverId(null)}
                       style={{ background: dragOverId === item.id ? C.primaryBg : C.surfaceAlt, cursor: 'grab' }}>
                       <td style={{ ...TD, textAlign: 'center' }} />
-                      <td style={{ ...TD, textAlign: 'center', color: C.textMuted, cursor: 'grab' }}>⠿</td>
-                      <td colSpan={11} style={{ ...TD, fontWeight: 700, fontSize: 13, padding: '6px 10px', color: C.text }}>
+                      <td colSpan={9} style={{ ...TD, fontWeight: 700, fontSize: 13, padding: '6px 10px', color: C.text }}>
                         <span onClick={() => toggleSection(item.id)} style={{ cursor: 'pointer', userSelect: 'none' }}>
                           {isCollapsed ? '▶' : '▼'} {item.name}
                         </span>
@@ -627,28 +637,18 @@ export default function EstimateView() {
                       <td style={{ ...TD, textAlign: 'center' }}>
                         <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
                       </td>
-                      <td style={{ ...TD, textAlign: 'center', color: C.textMuted, cursor: 'grab' }}>⠿</td>
                       <td style={TD}>{item.position}</td>
-                      <td style={TD}>{item.section}</td>
                       <td style={TD}>{item.type}</td>
-                      <td style={{ ...TD, maxWidth: 280 }}>
+                      <td style={{ ...TD, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {item.name}
                         {item.is_analogue && <span style={{ marginLeft: 6, padding: '1px 5px', background: C.success, color: '#fff', borderRadius: 10, fontSize: 10 }}>аналог</span>}
                         {item.is_optimized && <span style={{ marginLeft: 4, padding: '1px 5px', background: C.warning, color: '#fff', borderRadius: 10, fontSize: 10 }}>опт</span>}
                       </td>
                       <td style={TD}>{item.unit}</td>
-                      <td style={{ ...TD, minWidth: 60 }}>{editInput(item, 'quantity')}</td>
-                      <td style={{ ...TD, minWidth: 80 }}>{editInput(item, 'work_price')}</td>
-                      <td style={{ ...TD, minWidth: 80 }}>{editInput(item, 'mat_price')}</td>
+                      <td style={TD}>{editInput(item, 'quantity')}</td>
+                      <td style={TD}>{editInput(item, 'work_price')}</td>
+                      <td style={TD}>{editInput(item, 'mat_price')}</td>
                       <td style={TD}>{fmt(item.total)}</td>
-                      <td style={{ ...TD, minWidth: 120 }}>
-                        {item.type === 'Материал' && (
-                          item.source_url
-                            ? <a href={item.source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: C.primary, wordBreak: 'break-all' }}>🔗 {item.source_url.replace(/^https?:\/\//, '').slice(0, 25)}…</a>
-                            : editInput(item, 'source_url')
-                        )}
-                      </td>
-                      <td style={{ ...TD, minWidth: 120 }}>{editInput(item, 'comment')}</td>
                       <td style={TD}>
                         <div style={{ display: 'flex', gap: 4 }}>
                           {item.type === 'Материал' && (

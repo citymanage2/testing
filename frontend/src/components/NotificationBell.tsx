@@ -132,7 +132,7 @@ export default function NotificationBell() {
             justifyContent: 'center',
             padding: '0 4px',
             lineHeight: 1,
-            border: `2px solid ${C.headerBg}`,
+            border: `2px solid ${C.surface}`,
             pointerEvents: 'none',
           }}>
             {count > 99 ? '99+' : count}

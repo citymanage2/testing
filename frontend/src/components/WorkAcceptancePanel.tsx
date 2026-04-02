@@ -620,14 +620,21 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
               {/* Expanded items editor */}
               {isExpanded && (
                 <div style={{ borderTop: `1px solid ${C.border}` }}>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                      <colgroup>
+                        <col />
+                        <col style={{ width: 52 }} />
+                        <col style={{ width: 90 }} />
+                        <col style={{ width: 110 }} />
+                        <col style={{ width: 80 }} />
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th style={{ ...TH, width: '40%' }}>Наименование</th>
+                          <th style={{ ...TH }}>Наименование</th>
                           <th style={{ ...TH, textAlign: 'center' }}>Ед.</th>
                           <th style={{ ...TH, textAlign: 'right' }}>Всего в смете</th>
-                          <th style={{ ...TH, textAlign: 'right', width: 110 }}>Принято</th>
+                          <th style={{ ...TH, textAlign: 'right' }}>Принято</th>
                           <th style={{ ...TH, textAlign: 'right' }}>Остаток</th>
                         </tr>
                       </thead>
@@ -728,16 +735,24 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
         {progress.length === 0 ? (
           <p style={{ fontSize: 13, color: C.textMuted, margin: 0 }}>Нет данных о прогрессе</p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <colgroup>
+                <col />
+                <col style={{ width: 52 }} />
+                <col style={{ width: 80 }} />
+                <col style={{ width: 80 }} />
+                <col style={{ width: 80 }} />
+                <col style={{ width: 120 }} />
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ ...TH, width: '35%' }}>Наименование</th>
+                  <th style={{ ...TH }}>Наименование</th>
                   <th style={{ ...TH, textAlign: 'center' }}>Ед.</th>
                   <th style={{ ...TH, textAlign: 'right' }}>По смете</th>
                   <th style={{ ...TH, textAlign: 'right' }}>Принято</th>
                   <th style={{ ...TH, textAlign: 'right' }}>Остаток</th>
-                  <th style={{ ...TH, width: 140 }}>Прогресс</th>
+                  <th style={{ ...TH }}>Прогресс</th>
                 </tr>
               </thead>
               <tbody>
