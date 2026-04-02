@@ -67,6 +67,27 @@ export default function Layout() {
     }
   };
 
+  const downloadLogs = async () => {
+    try {
+      const r = await client.get('/notifications?limit=500');
+      const lines = (r.data as {created_at: string; title: string; body?: string}[]).map(n =>
+        `[${new Date(n.created_at).toLocaleString('ru-RU')}] ${n.title}${n.body ? ': ' + n.body : ''}`
+      );
+      const text = lines.length ? lines.join('\n') : '(нет записей)';
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `logs_${date}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`✓ Скачано ${lines.length} записей`);
+    } catch {
+      showToast('✗ Ошибка скачивания');
+    }
+  };
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: C.pageBg }}>
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
@@ -256,10 +277,27 @@ export default function Layout() {
         </main>
       </div>
 
+      {/* Download logs button — fixed bottom-right */}
+      <button
+        onClick={downloadLogs}
+        title="Скачать логи"
+        style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 500,
+          width: 44, height: 44, borderRadius: '50%',
+          background: C.primary, color: '#fff', border: 'none',
+          cursor: 'pointer', fontSize: 18,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 14px rgba(37,99,235,.4)',
+          transition: 'background .15s, box-shadow .15s',
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#1d4ed8'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = C.primary; }}
+      >⬇</button>
+
       {/* Toast notification */}
       {copyToast && (
         <div style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 501,
+          position: 'fixed', bottom: 80, right: 24, zIndex: 501,
           background: C.text, color: '#fff', borderRadius: 8,
           padding: '8px 14px', fontSize: 13, fontWeight: 500,
           boxShadow: '0 4px 12px rgba(0,0,0,.2)',
