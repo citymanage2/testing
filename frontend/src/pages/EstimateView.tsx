@@ -25,13 +25,15 @@ const ESTIMATE_STATUSES = [
   { value: 'draft', label: 'Черновик' },
   { value: 'internal_review', label: 'Внутреннее согласование' },
   { value: 'frozen', label: 'Заморожена' },
+  { value: 'signed', label: 'Подписана' },
   { value: 'archived', label: 'В архиве' },
 ];
 
 const ESTIMATE_STATUS_TRANSITIONS: Record<string, string[]> = {
   draft: ['internal_review'],
   internal_review: ['draft', 'frozen'],
-  frozen: ['internal_review', 'archived'],
+  frozen: ['internal_review', 'signed'],
+  signed: [],   // LOCKED - cannot transition away
   archived: [],
 };
 
@@ -59,6 +61,7 @@ export default function EstimateView() {
   const [taskName, setTaskName] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [estimateStatus, setEstimateStatus] = useState('');
+  const [projectStage, setProjectStage] = useState<string>('');
   const [docType, setDocType] = useState('');
   const [extras, setExtras] = useState<TaskExtras>({ overhead_pct: 0, overhead_sum: 0, transport_pct: 0, transport_sum: 0, contingency_pct: 0, contingency_sum: 0 });
   const [showExtras, setShowExtras] = useState(false);
@@ -101,6 +104,20 @@ export default function EstimateView() {
       setDocType(statusR.data.doc_type || '');
       setEstimateStatus(statusR.data.estimate_status || '');
       setExtras(extrasR.data);
+      // Load project stage for lock check
+      if ((statusR.data as any).project_id) {
+        client.get(`/projects/${(statusR.data as any).project_id}/stage`).then(r => {
+          setProjectStage(r.data.stage || '');
+        }).catch(() => {});
+      } else {
+        client.get<{ project_id?: string }>(`/tasks/${id}`).then(taskR => {
+          if (taskR.data.project_id) {
+            client.get(`/projects/${taskR.data.project_id}/stage`).then(r => {
+              setProjectStage(r.data.stage || '');
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
     }
     catch { setError('Ошибка загрузки'); }
     finally { setLoading(false); }
@@ -122,6 +139,7 @@ export default function EstimateView() {
   }) : [];
 
   function startEdit(item: Item, field: string) {
+    if (isLocked) return;
     setEditCell({ itemId: item.id, field });
     const val = field === 'work_price' ? item.price_work : field === 'mat_price' ? item.price_material : field === 'quantity' ? item.quantity : field === 'source_url' ? (item.source_url || '') : field === 'comment' ? (item.comment || '') : '';
     setEditVal(String(val));
@@ -350,6 +368,9 @@ export default function EstimateView() {
   const analogueItem = analogueItemId ? data.items.find(i => i.id === analogueItemId) : null;
   const allSections = Array.from(new Set(data.items.map(i => i.section || ''))).filter(Boolean);
 
+  const LOCKED_STAGES = ['EXECUTION', 'HANDOVER', 'WARRANTY', 'CLOSED'];
+  const isLocked = estimateStatus === 'signed' || LOCKED_STAGES.includes(projectStage);
+
   // Compute extra amounts
   const overheadAmt = extras.overhead_sum + data.total * extras.overhead_pct / 100;
   const transportAmt = extras.transport_sum + data.total * extras.transport_pct / 100;
@@ -451,8 +472,8 @@ export default function EstimateView() {
           style={{ ...INPUT, width: 200, padding: '5px 10px' }} />
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          <button onClick={addSection} style={btnOutline('sm')}>+ Раздел</button>
-          <button onClick={() => setShowAddRow(true)} style={btnPrimary('sm')}>+ Строка</button>
+          <button onClick={addSection} disabled={isLocked} style={{ ...btnOutline('sm'), opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>+ Раздел</button>
+          <button onClick={() => setShowAddRow(true)} disabled={isLocked} style={{ ...btnPrimary('sm'), opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>+ Строка</button>
         </div>
       </div>
 
@@ -526,6 +547,16 @@ export default function EstimateView() {
         </div>
       )}
 
+      {isLocked && (
+        <div style={{
+          background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8,
+          padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+        }}>
+          🔒 <strong>Смета защищена от изменений</strong>
+          {estimateStatus === 'signed' ? ' — смета подписана' : ' — проект в стадии реализации'}
+        </div>
+      )}
+
       {/* ── Content tabs ──────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 2, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 7, padding: 3, marginBottom: 14, width: 'fit-content' }}>
         {([['estimate', '📋 Смета'], ['acceptance', '✅ Субподрядчики'], ['docs', '📄 Документы']] as const).map(([t, l]) => (
@@ -583,7 +614,7 @@ export default function EstimateView() {
                         <span onClick={() => toggleSection(item.id)} style={{ cursor: 'pointer', userSelect: 'none' }}>
                           {isCollapsed ? '▶' : '▼'} {item.name}
                         </span>
-                        <button onClick={() => deleteItem(item.id)} style={{ marginLeft: 8, padding: '1px 6px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>✕</button>
+                        <button onClick={() => deleteItem(item.id)} disabled={isLocked} style={{ marginLeft: 8, padding: '1px 6px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 4, cursor: 'pointer', fontSize: 11, opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>✕</button>
                       </td>
                     </tr>
                   );
@@ -624,7 +655,7 @@ export default function EstimateView() {
                             <button onClick={() => setAnalogueItemId(item.id)} style={{ padding: '2px 8px', background: C.primaryBg, color: C.primary, border: `1px solid ${C.primary}33`, borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Аналоги</button>
                           )}
                           <button onClick={() => saveItemToCatalog(item.id)} title="Сохранить в каталог" style={{ padding: '2px 7px', background: C.successBg, color: C.success, border: `1px solid ${C.success}40`, borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>📋</button>
-                          <button onClick={() => deleteItem(item.id)} style={{ padding: '2px 6px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>✕</button>
+                          <button onClick={() => deleteItem(item.id)} disabled={isLocked} style={{ padding: '2px 6px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 4, cursor: 'pointer', fontSize: 11, opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>✕</button>
                         </div>
                       </td>
                     </tr>

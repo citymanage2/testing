@@ -53,6 +53,9 @@ interface ProgressItem {
 interface AcceptanceItem {
   estimate_item_id: string;
   quantity_accepted: number;
+  _name?: string;
+  _unit?: string;
+  _total_qty?: number;
 }
 
 interface Props {
@@ -228,24 +231,42 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
     }
     setExpandedAccId(accId);
     if (!accItems[accId]) {
-      // Pre-populate with zeros for every non-header item
-      const init: AcceptanceItem[] = nonHeaderItems().map((i) => ({
-        estimate_item_id: i.id,
-        quantity_accepted: 0,
-      }));
-      // Fetch existing saved items and merge
-      client.get<AcceptanceItem[]>(`${base}/acceptances/${accId}/items`)
-        .then(({ data }) => {
-          const map: Record<string, number> = {};
-          data.forEach((d) => { map[d.estimate_item_id] = d.quantity_accepted; });
-          setAccItems((prev) => ({
-            ...prev,
-            [accId]: init.map((i) => ({ ...i, quantity_accepted: map[i.estimate_item_id] ?? 0 })),
-          }));
-        })
-        .catch(() => {
-          setAccItems((prev) => ({ ...prev, [accId]: init }));
-        });
+      // Load items from contractor's contract (filtered)
+      client.get<{id:string;name:string;unit:string;quantity:number;contract_quantity?:number}[]>(
+        `${base}/acceptances/${accId}/contract-items`
+      ).then(({ data: contractItems }) => {
+        // Fetch existing saved items
+        client.get<AcceptanceItem[]>(`${base}/acceptances/${accId}/items`)
+          .then(({ data: savedItems }) => {
+            const savedMap: Record<string, number> = {};
+            savedItems.forEach(d => { savedMap[d.estimate_item_id] = d.quantity_accepted; });
+
+            const init: AcceptanceItem[] = contractItems.map(ci => ({
+              estimate_item_id: ci.id,
+              quantity_accepted: savedMap[ci.id] ?? 0,
+              // Extra display fields (not sent to server):
+              _name: ci.name,
+              _unit: ci.unit,
+              _total_qty: ci.contract_quantity ?? ci.quantity,
+            } as AcceptanceItem & {_name:string;_unit:string;_total_qty:number}));
+
+            setAccItems(prev => ({ ...prev, [accId]: init }));
+          })
+          .catch(() => {
+            const init: AcceptanceItem[] = contractItems.map(ci => ({
+              estimate_item_id: ci.id,
+              quantity_accepted: 0,
+            }));
+            setAccItems(prev => ({ ...prev, [accId]: init }));
+          });
+      }).catch(() => {
+        // Fallback to nonHeaderItems if endpoint fails
+        const init: AcceptanceItem[] = nonHeaderItems().map(i => ({
+          estimate_item_id: i.id,
+          quantity_accepted: 0,
+        }));
+        setAccItems(prev => ({ ...prev, [accId]: init }));
+      });
     }
   }
 
@@ -611,32 +632,64 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
                         </tr>
                       </thead>
                       <tbody>
-                        {nonHeaderItems().map((item) => {
-                          const row = rows.find((r) => r.estimate_item_id === item.id);
-                          const qtyAcc = row?.quantity_accepted ?? 0;
-                          const remaining = Math.max(0, item.quantity - qtyAcc);
-                          return (
-                            <tr key={item.id}>
-                              <td style={TD}>{item.name}</td>
-                              <td style={{ ...TD, textAlign: 'center', color: C.textSec }}>{item.unit}</td>
-                              <td style={{ ...TD, textAlign: 'right' }}>{item.quantity}</td>
-                              <td style={{ ...TD, textAlign: 'right', padding: '4px 10px' }}>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={item.quantity}
-                                  step="any"
-                                  style={{ ...INPUT, width: 80, textAlign: 'right', padding: '4px 6px' }}
-                                  value={qtyAcc}
-                                  onChange={(e) => setAccItemQty(acc.id, item.id, parseFloat(e.target.value) || 0)}
-                                />
-                              </td>
-                              <td style={{ ...TD, textAlign: 'right', color: remaining > 0 ? C.textSec : C.success }}>
-                                {remaining}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {rows.length > 0
+                          ? rows.map((row) => {
+                              // Use cached display fields if available, fall back to nonHeaderItems lookup
+                              const fallbackItem = nonHeaderItems().find(i => i.id === row.estimate_item_id);
+                              const displayName = row._name ?? fallbackItem?.name ?? row.estimate_item_id;
+                              const displayUnit = row._unit ?? fallbackItem?.unit ?? '';
+                              const totalQty = row._total_qty ?? fallbackItem?.quantity ?? 0;
+                              const qtyAcc = row.quantity_accepted;
+                              const remaining = Math.max(0, totalQty - qtyAcc);
+                              return (
+                                <tr key={row.estimate_item_id}>
+                                  <td style={TD}>{displayName}</td>
+                                  <td style={{ ...TD, textAlign: 'center', color: C.textSec }}>{displayUnit}</td>
+                                  <td style={{ ...TD, textAlign: 'right' }}>{totalQty}</td>
+                                  <td style={{ ...TD, textAlign: 'right', padding: '4px 10px' }}>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={totalQty}
+                                      step="any"
+                                      style={{ ...INPUT, width: 80, textAlign: 'right', padding: '4px 6px' }}
+                                      value={qtyAcc}
+                                      onChange={(e) => setAccItemQty(acc.id, row.estimate_item_id, parseFloat(e.target.value) || 0)}
+                                    />
+                                  </td>
+                                  <td style={{ ...TD, textAlign: 'right', color: remaining > 0 ? C.textSec : C.success }}>
+                                    {remaining}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          : nonHeaderItems().map((item) => {
+                              const row = rows.find((r) => r.estimate_item_id === item.id);
+                              const qtyAcc = row?.quantity_accepted ?? 0;
+                              const remaining = Math.max(0, item.quantity - qtyAcc);
+                              return (
+                                <tr key={item.id}>
+                                  <td style={TD}>{item.name}</td>
+                                  <td style={{ ...TD, textAlign: 'center', color: C.textSec }}>{item.unit}</td>
+                                  <td style={{ ...TD, textAlign: 'right' }}>{item.quantity}</td>
+                                  <td style={{ ...TD, textAlign: 'right', padding: '4px 10px' }}>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={item.quantity}
+                                      step="any"
+                                      style={{ ...INPUT, width: 80, textAlign: 'right', padding: '4px 6px' }}
+                                      value={qtyAcc}
+                                      onChange={(e) => setAccItemQty(acc.id, item.id, parseFloat(e.target.value) || 0)}
+                                    />
+                                  </td>
+                                  <td style={{ ...TD, textAlign: 'right', color: remaining > 0 ? C.textSec : C.success }}>
+                                    {remaining}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                        }
                       </tbody>
                     </table>
                   </div>

@@ -8,7 +8,7 @@ import ClientActsManager from '../components/ClientActsManager';
 import PurchaseRequests from '../components/PurchaseRequests';
 import WarrantyClaims from '../components/WarrantyClaims';
 import KpRequests from '../components/KpRequests';
-import { C, btnPrimary, btnOutline, btnDanger, btnGhost, INPUT, LBL, CARD, TH, TD, OVERLAY, MODAL } from '../ui';
+import { C, btnPrimary, btnOutline, btnDanger, btnGhost, badge, INPUT, LBL, CARD, TH, TD, OVERLAY, MODAL } from '../ui';
 
 interface CardData {
   id: string; name: string; description?: string; address?: string;
@@ -27,6 +27,14 @@ interface FinSummary { budget_planned?: number; estimate_total: number; income_r
 interface Contractor { id: string; kind: string; name: string; }
 interface TaskInProject { id: string; task_type: string; status: string; estimate_status?: string; name?: string; created_at: string; }
 interface StageInfo { stage: string; stage_label: string; allowed_next_stages: {stage: string; label: string}[]; }
+
+const STAGE_ORDER = ['LEAD','ESTIMATION','OPTIMIZATION','APPROVAL','EXECUTION','HANDOVER','WARRANTY','CLOSED'];
+
+const STAGE_LABELS: Record<string, string> = {
+  LEAD: 'Лид/Продажа', ESTIMATION: 'Осмечивание', OPTIMIZATION: 'Оптимизация',
+  APPROVAL: 'Согласование КП', EXECUTION: 'Реализация', HANDOVER: 'Сдача объекта',
+  WARRANTY: 'Гарантийный период', CLOSED: 'Закрыт',
+};
 
 const STAGE_COLORS: Record<string, string> = {
   LEAD: C.textMuted, ESTIMATION: C.warning, OPTIMIZATION: '#7c3aed',
@@ -164,20 +172,6 @@ export default function ProjectDetail() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* Stage transition buttons */}
-            {stageInfo?.allowed_next_stages.map(s => {
-              const hint = suggestions.find(sg => sg.stage === s.stage);
-              return (
-                <button
-                  key={s.stage}
-                  style={{...btnOutline('sm'), opacity: hint && !hint.ready ? 0.6 : 1}}
-                  title={hint?.condition_hint}
-                  onClick={() => { setPendingStage(s.stage); setShowStageModal(true); }}
-                >
-                  {hint && hint.ready ? '✅' : hint ? '⚠️' : ''} {s.label}
-                </button>
-              );
-            })}
             {editing ? (
               <>
                 <button onClick={saveCard} disabled={saving} style={btnPrimary('sm')}>{saving ? 'Сохранение...' : 'Сохранить'}</button>
@@ -232,6 +226,63 @@ export default function ProjectDetail() {
 
       {/* ── Tab content ── */}
       {tab === 'info' && (
+        <div>
+        {/* Stage Stepper */}
+        <div style={{ ...CARD, padding: 16, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: C.text }}>Стадии проекта</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {STAGE_ORDER.map((stage, idx) => {
+              const currentIdx = STAGE_ORDER.indexOf(stageInfo?.stage || 'LEAD');
+              const isCompleted = idx < currentIdx;
+              const isCurrent = idx === currentIdx;
+              const isFuture = idx > currentIdx;
+              const suggestion = suggestions.find(s => s.stage === stage);
+              const isAllowed = stageInfo?.allowed_next_stages?.some(s => s.stage === stage);
+
+              return (
+                <div key={stage} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '8px 0', borderBottom: idx < STAGE_ORDER.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                  {/* Circle indicator */}
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 13, fontWeight: 700,
+                    background: isCompleted ? C.success : isCurrent ? C.primary : C.surfaceAlt,
+                    color: isCompleted || isCurrent ? '#fff' : C.textMuted,
+                    border: `2px solid ${isCompleted ? C.success : isCurrent ? C.primary : C.border}`,
+                  }}>
+                    {isCompleted ? '✓' : idx + 1}
+                  </div>
+                  {/* Label + action */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: isCurrent ? 700 : 500, color: isFuture && !isAllowed ? C.textMuted : C.text }}>
+                        {STAGE_LABELS[stage]}
+                      </span>
+                      {isCurrent && <span style={badge(C.primary, C.primaryBg)}>Текущая</span>}
+                      {isAllowed && !isCurrent && (
+                        <span style={badge(suggestion?.ready ? C.success : C.warning, suggestion?.ready ? C.successBg : C.warningBg)}>
+                          {suggestion?.ready ? '✅ Готово' : '⚠️ Условия'}
+                        </span>
+                      )}
+                    </div>
+                    {isAllowed && !isCurrent && (
+                      <button
+                        style={{ ...btnOutline('sm'), marginTop: 4 }}
+                        title={suggestion?.condition_hint}
+                        onClick={() => { setPendingStage(stage); setShowStageModal(true); }}
+                      >
+                        Перейти →
+                      </button>
+                    )}
+                    {isAllowed && suggestion && !suggestion.ready && (
+                      <div style={{ fontSize: 11, color: C.warning, marginTop: 2 }}>{suggestion.condition_hint}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
           {[
             ['Стадия проекта', stageInfo?.stage_label || '—'],
@@ -255,6 +306,7 @@ export default function ProjectDetail() {
               <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', color: C.text }}>{card.notes}</div>
             </div>
           )}
+        </div>
         </div>
       )}
 
@@ -374,7 +426,7 @@ export default function ProjectDetail() {
       {showStageModal && (
         <div style={OVERLAY}>
           <div style={{ ...MODAL, maxWidth: 400 }}>
-            <h3 style={{ margin: '0 0 14px', fontSize: 16 }}>Перейти на стадию: {stageInfo?.allowed_next_stages.find(s => s.stage === pendingStage)?.label}</h3>
+            <h3 style={{ margin: '0 0 14px', fontSize: 16 }}>Перейти на стадию: {STAGE_LABELS[pendingStage] || stageInfo?.allowed_next_stages.find(s => s.stage === pendingStage)?.label}</h3>
             <label style={LBL}>Причина перехода (необязательно)
               <textarea value={stageReason} onChange={e => setStageReason(e.target.value)} rows={3} style={{ ...INPUT, marginTop: 4, resize: 'vertical' }} />
             </label>

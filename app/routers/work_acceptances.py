@@ -14,6 +14,7 @@ from app.models.task import Task
 from app.models.estimate_item import EstimateItem
 from app.models.contractor import Contractor
 from app.models.work_acceptance import SubcontractorAssignment, WorkAcceptance, WorkAcceptanceItem
+from app.models.subcontractor_contract import SubcontractorContract, SubcontractorContractItem
 
 router = APIRouter(tags=["work-acceptances"])
 
@@ -383,6 +384,113 @@ async def delete_acceptance(
 # ---------------------------------------------------------------------------
 # Work acceptance items
 # ---------------------------------------------------------------------------
+
+@router.get("/estimates/{task_id}/acceptances/{acc_id}/contract-items")
+async def get_acceptance_contract_items(
+    task_id: str,
+    acc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Returns estimate items from the acceptance's contractor's contract for this project's estimates."""
+    await _get_estimate(task_id, current_user, db)
+    acceptance = await _get_acceptance(acc_id, task_id, db)
+
+    # Find the contractor's contracts for this project
+    # Get the project_id from task
+    from app.models.task import Task as TaskModel
+    task = await db.get(TaskModel, task_id)
+
+    if not task or not task.project_id:
+        # Fallback: return all estimate items
+        result = await db.execute(
+            select(EstimateItem).where(
+                EstimateItem.task_id == task_id,
+                EstimateItem.row_type != "section_header",
+            ).order_by(EstimateItem.sort_order, EstimateItem.position)
+        )
+        items = result.scalars().all()
+        return [{"id": i.id, "name": i.name, "unit": i.unit, "quantity": i.quantity, "row_type": i.row_type} for i in items]
+
+    from sqlalchemy import and_
+
+    # Find contracts for this contractor on this project
+    contracts_r = await db.execute(
+        select(SubcontractorContract).where(
+            and_(
+                SubcontractorContract.project_id == task.project_id,
+                SubcontractorContract.contractor_id == acceptance.contractor_id,
+                SubcontractorContract.status == "signed",
+            )
+        )
+    )
+    contracts = contracts_r.scalars().all()
+
+    if not contracts:
+        # No signed contract - return all items (permissive fallback)
+        result = await db.execute(
+            select(EstimateItem).where(
+                EstimateItem.task_id == task_id,
+                EstimateItem.row_type != "section_header",
+            ).order_by(EstimateItem.sort_order, EstimateItem.position)
+        )
+        items = result.scalars().all()
+        return [{"id": i.id, "name": i.name, "unit": i.unit, "quantity": i.quantity, "row_type": i.row_type} for i in items]
+
+    # Get estimate_item_ids from contract items (items that have an estimate_item_id)
+    contract_ids = [c.id for c in contracts]
+    contract_items_r = await db.execute(
+        select(SubcontractorContractItem).where(
+            and_(
+                SubcontractorContractItem.contract_id.in_(contract_ids),
+                SubcontractorContractItem.estimate_item_id.isnot(None),
+            )
+        )
+    )
+    contract_items = contract_items_r.scalars().all()
+
+    estimate_item_ids = list({ci.estimate_item_id for ci in contract_items})
+
+    if not estimate_item_ids:
+        # Contract has no estimate items linked - permissive fallback
+        result = await db.execute(
+            select(EstimateItem).where(
+                EstimateItem.task_id == task_id,
+                EstimateItem.row_type != "section_header",
+            ).order_by(EstimateItem.sort_order, EstimateItem.position)
+        )
+        items = result.scalars().all()
+        return [{"id": i.id, "name": i.name, "unit": i.unit, "quantity": i.quantity, "row_type": i.row_type} for i in items]
+
+    # Return only the estimate items that are in the contract
+    result = await db.execute(
+        select(EstimateItem).where(
+            and_(
+                EstimateItem.id.in_(estimate_item_ids),
+                EstimateItem.task_id == task_id,
+            )
+        ).order_by(EstimateItem.sort_order, EstimateItem.position)
+    )
+    items = result.scalars().all()
+
+    # Also include contract item quantities for reference
+    item_id_to_contract_qty: dict = {}
+    for ci in contract_items:
+        if ci.estimate_item_id:
+            item_id_to_contract_qty[ci.estimate_item_id] = float(ci.quantity)
+
+    return [
+        {
+            "id": i.id,
+            "name": i.name,
+            "unit": i.unit,
+            "quantity": i.quantity,
+            "contract_quantity": item_id_to_contract_qty.get(i.id, i.quantity),
+            "row_type": i.row_type,
+        }
+        for i in items
+    ]
+
 
 @router.get("/estimates/{task_id}/acceptances/{acc_id}/items", response_model=List[AcceptanceItemOut])
 async def list_acceptance_items(

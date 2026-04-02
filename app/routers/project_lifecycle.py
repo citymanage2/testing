@@ -56,6 +56,12 @@ async def _check_transition_conditions(project, to_stage: str, db: AsyncSession)
     if to_stage == "EXECUTION":
         if not getattr(project, "project_manager_id", None):
             return "Назначьте руководителя проекта перед переходом в Реализацию"
+        # Also require at least one signed estimate
+        tasks_r = await db.execute(select(Task).where(Task.project_id == project.id))
+        tasks = tasks_r.scalars().all()
+        signed = [t for t in tasks if t.estimate_status == "signed"]
+        if not signed:
+            return "Для перехода в Реализацию необходима хотя бы одна подписанная смета"
     if to_stage == "HANDOVER":
         acts_r = await db.execute(
             select(ClientKs2Act).where(

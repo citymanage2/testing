@@ -23,6 +23,21 @@ from app.schemas.estimate import (
 
 router = APIRouter()
 
+LOCKED_ESTIMATE_STATUSES = {"signed"}
+LOCKED_PROJECT_STAGES = {"EXECUTION", "HANDOVER", "WARRANTY", "CLOSED"}
+
+async def _check_estimate_editable(task: Task, db: AsyncSession) -> Optional[str]:
+    """Returns error message if estimate is not editable, None if OK."""
+    if task.estimate_status in LOCKED_ESTIMATE_STATUSES:
+        return "Смета подписана и не может быть изменена"
+    # Check project stage
+    if task.project_id:
+        from app.models.project import Project
+        project = await db.get(Project, task.project_id)
+        if project and getattr(project, "stage", None) in LOCKED_PROJECT_STAGES:
+            return "Смета заморожена: проект находится на стадии реализации"
+    return None
+
 
 @router.post("", response_model=ProjectResponse, status_code=201)
 async def create_project(body: ProjectCreate, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
@@ -88,6 +103,8 @@ async def update_estimate_status(task_id: str, body: EstimateStatusUpdate, curre
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    if task.estimate_status == "signed":
+        raise HTTPException(status_code=403, detail="Подписанная смета не может быть изменена")
     task.estimate_status = body.status
     task.estimate_status_updated_at = datetime.now(timezone.utc)
     task.estimate_status_updated_by = body.updated_by
@@ -110,6 +127,10 @@ async def add_estimate_status_log(
     db: AsyncSession = Depends(get_db),
 ):
     from app.models.estimate_item_log import EstimateItemLog
+    # Block changes to signed estimates
+    existing_task = await db.get(Task, task_id)
+    if existing_task and existing_task.estimate_status == "signed":
+        raise HTTPException(status_code=403, detail="Подписанная смета не может быть изменена")
     log = EstimateItemLog(
         id=str(uuid.uuid4()),
         task_id=task_id,
@@ -223,6 +244,11 @@ async def update_item(task_id: str, item_id: str, body: EstimateItemUpdate, curr
     item = await db.get(EstimateItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+    task = await db.get(Task, task_id)
+    if task:
+        lock_error = await _check_estimate_editable(task, db)
+        if lock_error:
+            raise HTTPException(status_code=403, detail=lock_error)
     if body.section is not None: item.section = body.section
     if body.name is not None: item.name = body.name
     if body.unit is not None: item.unit = body.unit
@@ -371,6 +397,11 @@ async def update_extras(task_id: str, body: TaskExtras, current_user: CurrentUse
 
 @router.post("/estimates/{task_id}/items", response_model=EstimateItemSchema, status_code=201)
 async def add_estimate_item(task_id: str, body: EstimateItemCreate, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    task = await db.get(Task, task_id)
+    if task:
+        lock_error = await _check_estimate_editable(task, db)
+        if lock_error:
+            raise HTTPException(status_code=403, detail=lock_error)
     existing = (await db.execute(select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.sort_order.desc(), EstimateItem.position.desc()).limit(1))).scalars().first()
     position = (existing.position + 1) if existing else 0
     max_sort = (existing.sort_order + 1.0) if existing else 0.0
@@ -444,6 +475,11 @@ async def delete_estimate_item(task_id: str, item_id: str, current_user: Current
     item = await db.get(EstimateItem, item_id)
     if not item or item.task_id != task_id:
         raise HTTPException(status_code=404, detail="Item not found")
+    task = await db.get(Task, task_id)
+    if task:
+        lock_error = await _check_estimate_editable(task, db)
+        if lock_error:
+            raise HTTPException(status_code=403, detail=lock_error)
     await db.delete(item)
     await db.commit()
 

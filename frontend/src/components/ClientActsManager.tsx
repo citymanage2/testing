@@ -230,6 +230,16 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
                       {act.status === 'draft' && (
                         <button style={btnDanger('sm')} onClick={() => deleteAct(act.id)}>✕</button>
                       )}
+                      {act.status === 'signed' && (
+                        <a
+                          href={`${import.meta.env.VITE_API_BASE_URL || ''}/projects/${projectId}/client-acts/${act.id}/export-ks2`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={btnOutline('sm')}
+                        >
+                          📄 КС-2
+                        </a>
+                      )}
                     </div>
                   </div>
 
