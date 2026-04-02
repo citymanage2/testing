@@ -132,6 +132,20 @@ export default function TaskStatus() {
         <button onClick={downloadLog} style={btn('#546e7a')}>Скачать .txt</button>
         <button onClick={copyLog} style={btn(copied ? '#4caf50' : '#78909c')}>{copied ? 'Скопировано!' : 'Копировать'}</button>
       </div>
+
+      <button
+        onClick={copyLog}
+        title="Скопировать логи"
+        style={{
+          position: 'fixed', bottom: 24, right: 24,
+          padding: '10px 18px', background: copied ? '#4caf50' : '#546e7a',
+          color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer',
+          fontSize: 13, fontWeight: 500, boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+          transition: 'background 0.2s',
+        }}
+      >
+        {copied ? 'Скопировано!' : 'Скопировать логи'}
+      </button>
     </div>
   );
 }
