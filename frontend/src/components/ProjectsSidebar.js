@@ -11,7 +11,7 @@ const TYPE_LABELS = {
     RESEARCH_PROJECT: 'Исследование', SCAN_TO_EXCEL: 'Скан→Excel', COMPARE_PROJECT_SMETA: 'Сравнение', IMPORT_EXCEL: 'Импорт Excel',
 };
 const STATUS_COLOR = { completed: C.success, failed: C.danger, processing: C.warning };
-export default function ProjectsSidebar() {
+export default function ProjectsSidebar({ collapsed } = {}) {
     const [projects, setProjects] = useState([]);
     const [expanded, setExpanded] = useState(null);
     const [detail, setDetail] = useState(null);
@@ -106,6 +106,13 @@ export default function ProjectsSidebar() {
             await client.post('/projects', { name: n.trim() });
             load();
         }
+    }
+    if (collapsed) {
+        return (_jsx("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4, gap: 2 }, children: projects.map(p => (_jsx("button", { onClick: () => navigate(`/projects/${p.id}`), title: p.name, style: {
+                    width: 40, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'transparent', border: 'none', borderRadius: 6,
+                    cursor: 'pointer', fontSize: 18,
+                }, children: "\uD83D\uDCC1" }, p.id))) }));
     }
     return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', height: '100%' }, children: [_jsx("div", { style: { padding: '12px 12px 8px', borderBottom: `1px solid ${C.border}` }, children: _jsxs("button", { onClick: addProject, style: {
                         width: '100%', padding: '7px 12px', background: C.primary, color: '#fff',

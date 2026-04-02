@@ -106,7 +106,7 @@ export default function NotificationBell() {
                             justifyContent: 'center',
                             padding: '0 4px',
                             lineHeight: 1,
-                            border: `2px solid ${C.headerBg}`,
+                            border: `2px solid ${C.surface}`,
                             pointerEvents: 'none',
                         }, children: count > 99 ? '99+' : count }))] }), open && (_jsxs("div", { ref: panelRef, style: {
                     position: 'fixed',
