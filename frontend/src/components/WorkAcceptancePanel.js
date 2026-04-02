@@ -160,23 +160,37 @@ export default function WorkAcceptancePanel({ taskId, items }) {
         }
         setExpandedAccId(accId);
         if (!accItems[accId]) {
-            // Pre-populate with zeros for every non-header item
-            const init = nonHeaderItems().map((i) => ({
-                estimate_item_id: i.id,
-                quantity_accepted: 0,
-            }));
-            // Fetch existing saved items and merge
-            client.get(`${base}/acceptances/${accId}/items`)
-                .then(({ data }) => {
-                const map = {};
-                data.forEach((d) => { map[d.estimate_item_id] = d.quantity_accepted; });
-                setAccItems((prev) => ({
-                    ...prev,
-                    [accId]: init.map((i) => ({ ...i, quantity_accepted: map[i.estimate_item_id] ?? 0 })),
+            // Load items from contractor's contract (filtered)
+            client.get(`${base}/acceptances/${accId}/contract-items`).then(({ data: contractItems }) => {
+                // Fetch existing saved items
+                client.get(`${base}/acceptances/${accId}/items`)
+                    .then(({ data: savedItems }) => {
+                    const savedMap = {};
+                    savedItems.forEach(d => { savedMap[d.estimate_item_id] = d.quantity_accepted; });
+                    const init = contractItems.map(ci => ({
+                        estimate_item_id: ci.id,
+                        quantity_accepted: savedMap[ci.id] ?? 0,
+                        // Extra display fields (not sent to server):
+                        _name: ci.name,
+                        _unit: ci.unit,
+                        _total_qty: ci.contract_quantity ?? ci.quantity,
+                    }));
+                    setAccItems(prev => ({ ...prev, [accId]: init }));
+                })
+                    .catch(() => {
+                    const init = contractItems.map(ci => ({
+                        estimate_item_id: ci.id,
+                        quantity_accepted: 0,
+                    }));
+                    setAccItems(prev => ({ ...prev, [accId]: init }));
+                });
+            }).catch(() => {
+                // Fallback to nonHeaderItems if endpoint fails
+                const init = nonHeaderItems().map(i => ({
+                    estimate_item_id: i.id,
+                    quantity_accepted: 0,
                 }));
-            })
-                .catch(() => {
-                setAccItems((prev) => ({ ...prev, [accId]: init }));
+                setAccItems(prev => ({ ...prev, [accId]: init }));
             });
         }
     }
@@ -255,12 +269,23 @@ export default function WorkAcceptancePanel({ taskId, items }) {
                                     }, children: [_jsx("button", { style: { ...btnGhost('sm'), padding: '2px 6px', fontSize: 16, color: C.primary }, onClick: () => toggleExpand(acc.id), title: isExpanded ? 'Свернуть' : 'Развернуть', children: isExpanded ? '▾' : '▸' }), _jsxs("span", { style: { fontWeight: 600, fontSize: 13, color: C.text, minWidth: 80 }, children: ["\u2116 ", acc.act_number] }), _jsxs("span", { style: { fontSize: 13, color: C.textSec, flex: 1 }, children: [contractorName(acc.contractor_id), acc.period_start && acc.period_end && (_jsxs("span", { style: { color: C.textMuted, marginLeft: 8 }, children: [acc.period_start, " \u2014 ", acc.period_end] }))] }), _jsx("span", { style: statusBadge(acc.status), children: STATUS_LABEL[acc.status] ?? acc.status }), _jsxs("span", { style: { fontSize: 12, color: C.textSec }, children: [acc.items_count, " \u043F\u043E\u0437. \u00B7 ", acc.total_accepted_value?.toLocaleString('ru-RU'), " \u20BD"] }), _jsx("button", { style: btnOutline('sm'), disabled: updatingStatus === acc.id, title: "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u0441\u0442\u0430\u0442\u0443\u0441", onClick: () => {
                                                 const next = acc.status === 'draft' ? 'accepted' : acc.status === 'accepted' ? 'rejected' : 'draft';
                                                 updateStatus(acc.id, next);
-                                            }, children: updatingStatus === acc.id ? '...' : '⟳' }), _jsx("button", { style: btnDanger('sm'), disabled: deletingAcc === acc.id, title: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0430\u043A\u0442", onClick: () => deleteAcceptance(acc.id), children: deletingAcc === acc.id ? '...' : '✕' })] }), isExpanded && (_jsxs("div", { style: { borderTop: `1px solid ${C.border}` }, children: [_jsx("div", { style: { overflowX: 'auto' }, children: _jsxs("table", { style: { width: '100%', borderCollapse: 'collapse' }, children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { style: { ...TH, width: '40%' }, children: "\u041D\u0430\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u043D\u0438\u0435" }), _jsx("th", { style: { ...TH, textAlign: 'center' }, children: "\u0415\u0434." }), _jsx("th", { style: { ...TH, textAlign: 'right' }, children: "\u0412\u0441\u0435\u0433\u043E \u0432 \u0441\u043C\u0435\u0442\u0435" }), _jsx("th", { style: { ...TH, textAlign: 'right', width: 110 }, children: "\u041F\u0440\u0438\u043D\u044F\u0442\u043E" }), _jsx("th", { style: { ...TH, textAlign: 'right' }, children: "\u041E\u0441\u0442\u0430\u0442\u043E\u043A" })] }) }), _jsx("tbody", { children: nonHeaderItems().map((item) => {
-                                                            const row = rows.find((r) => r.estimate_item_id === item.id);
-                                                            const qtyAcc = row?.quantity_accepted ?? 0;
-                                                            const remaining = Math.max(0, item.quantity - qtyAcc);
-                                                            return (_jsxs("tr", { children: [_jsx("td", { style: TD, children: item.name }), _jsx("td", { style: { ...TD, textAlign: 'center', color: C.textSec }, children: item.unit }), _jsx("td", { style: { ...TD, textAlign: 'right' }, children: item.quantity }), _jsx("td", { style: { ...TD, textAlign: 'right', padding: '4px 10px' }, children: _jsx("input", { type: "number", min: 0, max: item.quantity, step: "any", style: { ...INPUT, width: 80, textAlign: 'right', padding: '4px 6px' }, value: qtyAcc, onChange: (e) => setAccItemQty(acc.id, item.id, parseFloat(e.target.value) || 0) }) }), _jsx("td", { style: { ...TD, textAlign: 'right', color: remaining > 0 ? C.textSec : C.success }, children: remaining })] }, item.id));
-                                                        }) })] }) }), _jsxs("div", { style: { display: 'flex', gap: 8, padding: '10px 12px', borderTop: `1px solid ${C.border}`, background: C.surfaceAlt }, children: [_jsx("button", { style: btnPrimary('sm'), disabled: savingItems === acc.id, onClick: () => saveAccItems(acc.id), children: savingItems === acc.id ? 'Сохранение...' : 'Сохранить позиции' }), _jsx("button", { style: btnOutline('sm'), onClick: () => {
+                                            }, children: updatingStatus === acc.id ? '...' : '⟳' }), _jsx("button", { style: btnDanger('sm'), disabled: deletingAcc === acc.id, title: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0430\u043A\u0442", onClick: () => deleteAcceptance(acc.id), children: deletingAcc === acc.id ? '...' : '✕' })] }), isExpanded && (_jsxs("div", { style: { borderTop: `1px solid ${C.border}` }, children: [_jsx("div", { style: { overflowX: 'auto' }, children: _jsxs("table", { style: { width: '100%', borderCollapse: 'collapse' }, children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { style: { ...TH, width: '40%' }, children: "\u041D\u0430\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u043D\u0438\u0435" }), _jsx("th", { style: { ...TH, textAlign: 'center' }, children: "\u0415\u0434." }), _jsx("th", { style: { ...TH, textAlign: 'right' }, children: "\u0412\u0441\u0435\u0433\u043E \u0432 \u0441\u043C\u0435\u0442\u0435" }), _jsx("th", { style: { ...TH, textAlign: 'right', width: 110 }, children: "\u041F\u0440\u0438\u043D\u044F\u0442\u043E" }), _jsx("th", { style: { ...TH, textAlign: 'right' }, children: "\u041E\u0441\u0442\u0430\u0442\u043E\u043A" })] }) }), _jsx("tbody", { children: rows.length > 0
+                                                            ? rows.map((row) => {
+                                                                // Use cached display fields if available, fall back to nonHeaderItems lookup
+                                                                const fallbackItem = nonHeaderItems().find(i => i.id === row.estimate_item_id);
+                                                                const displayName = row._name ?? fallbackItem?.name ?? row.estimate_item_id;
+                                                                const displayUnit = row._unit ?? fallbackItem?.unit ?? '';
+                                                                const totalQty = row._total_qty ?? fallbackItem?.quantity ?? 0;
+                                                                const qtyAcc = row.quantity_accepted;
+                                                                const remaining = Math.max(0, totalQty - qtyAcc);
+                                                                return (_jsxs("tr", { children: [_jsx("td", { style: TD, children: displayName }), _jsx("td", { style: { ...TD, textAlign: 'center', color: C.textSec }, children: displayUnit }), _jsx("td", { style: { ...TD, textAlign: 'right' }, children: totalQty }), _jsx("td", { style: { ...TD, textAlign: 'right', padding: '4px 10px' }, children: _jsx("input", { type: "number", min: 0, max: totalQty, step: "any", style: { ...INPUT, width: 80, textAlign: 'right', padding: '4px 6px' }, value: qtyAcc, onChange: (e) => setAccItemQty(acc.id, row.estimate_item_id, parseFloat(e.target.value) || 0) }) }), _jsx("td", { style: { ...TD, textAlign: 'right', color: remaining > 0 ? C.textSec : C.success }, children: remaining })] }, row.estimate_item_id));
+                                                            })
+                                                            : nonHeaderItems().map((item) => {
+                                                                const row = rows.find((r) => r.estimate_item_id === item.id);
+                                                                const qtyAcc = row?.quantity_accepted ?? 0;
+                                                                const remaining = Math.max(0, item.quantity - qtyAcc);
+                                                                return (_jsxs("tr", { children: [_jsx("td", { style: TD, children: item.name }), _jsx("td", { style: { ...TD, textAlign: 'center', color: C.textSec }, children: item.unit }), _jsx("td", { style: { ...TD, textAlign: 'right' }, children: item.quantity }), _jsx("td", { style: { ...TD, textAlign: 'right', padding: '4px 10px' }, children: _jsx("input", { type: "number", min: 0, max: item.quantity, step: "any", style: { ...INPUT, width: 80, textAlign: 'right', padding: '4px 6px' }, value: qtyAcc, onChange: (e) => setAccItemQty(acc.id, item.id, parseFloat(e.target.value) || 0) }) }), _jsx("td", { style: { ...TD, textAlign: 'right', color: remaining > 0 ? C.textSec : C.success }, children: remaining })] }, item.id));
+                                                            }) })] }) }), _jsxs("div", { style: { display: 'flex', gap: 8, padding: '10px 12px', borderTop: `1px solid ${C.border}`, background: C.surfaceAlt }, children: [_jsx("button", { style: btnPrimary('sm'), disabled: savingItems === acc.id, onClick: () => saveAccItems(acc.id), children: savingItems === acc.id ? 'Сохранение...' : 'Сохранить позиции' }), _jsx("button", { style: btnOutline('sm'), onClick: () => {
                                                         // Emit a custom event that the parent EstimateView can listen to
                                                         window.dispatchEvent(new CustomEvent('generate-ks2', { detail: { acceptanceId: acc.id, taskId } }));
                                                     }, children: "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u041A\u0421-2" })] })] }))] }, acc.id));
