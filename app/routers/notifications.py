@@ -52,7 +52,7 @@ class UnreadCountResponse(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.get("/notifications", response_model=list[NotificationResponse])
+@router.get("", response_model=list[NotificationResponse])
 async def list_notifications(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
@@ -82,7 +82,7 @@ async def list_notifications(
     ]
 
 
-@router.get("/notifications/unread-count", response_model=UnreadCountResponse)
+@router.get("/unread-count", response_model=UnreadCountResponse)
 async def unread_count(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
@@ -99,7 +99,7 @@ async def unread_count(
     return UnreadCountResponse(count=count)
 
 
-@router.post("/notifications/read-all", response_model=ReadAllResponse)
+@router.post("/read-all", response_model=ReadAllResponse)
 async def mark_all_read(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
@@ -123,7 +123,7 @@ async def mark_all_read(
     return ReadAllResponse(marked=count)
 
 
-@router.patch("/notifications/{notif_id}/read", response_model=NotificationResponse)
+@router.patch("/{notif_id}/read", response_model=NotificationResponse)
 async def mark_one_read(
     notif_id: str,
     current_user: CurrentUser,
@@ -151,7 +151,7 @@ async def mark_one_read(
     )
 
 
-@router.delete("/notifications/{notif_id}", status_code=204)
+@router.delete("/{notif_id}", status_code=204)
 async def delete_notification(
     notif_id: str,
     current_user: CurrentUser,
@@ -167,7 +167,7 @@ async def delete_notification(
     await db.commit()
 
 
-@router.post("/notifications", response_model=NotificationResponse, status_code=201)
+@router.post("", response_model=NotificationResponse, status_code=201)
 async def create_notification(
     body: NotificationCreate,
     db: AsyncSession = Depends(get_db),
