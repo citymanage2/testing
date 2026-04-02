@@ -282,7 +282,8 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
   async function saveAccItems(accId: string) {
     setSavingItems(accId);
     try {
-      await client.put(`${base}/acceptances/${accId}/items`, accItems[accId] ?? []);
+      const payload = (accItems[accId] ?? []).map(({ estimate_item_id, quantity_accepted }) => ({ estimate_item_id, quantity_accepted }));
+      await client.put(`${base}/acceptances/${accId}/items`, payload);
       // Refresh acceptances to update totals
       const { data } = await client.get<Acceptance[]>(`${base}/acceptances`);
       setAcceptances(data);
