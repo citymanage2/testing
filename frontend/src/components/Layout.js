@@ -18,30 +18,28 @@ export default function Layout() {
     const logout = useAuthStore((s) => s.logout);
     const isAdmin = useAuthStore.getState().role === 'admin';
     const [menuOpen, setMenuOpen] = useState(false);
+    const [copyToast, setCopyToast] = useState(null);
+    const showToast = (msg) => {
+        setCopyToast(msg);
+        setTimeout(() => setCopyToast(null), 2500);
+    };
     const copyLogs = async () => {
         try {
             const r = await client.get('/notifications?limit=50');
             const lines = r.data.map(n => `[${new Date(n.created_at).toLocaleString('ru-RU')}] ${n.title}${n.body ? ': ' + n.body : ''}`);
             const text = lines.length ? lines.join('\n') : '(нет записей)';
-            // Try modern clipboard API first, fall back to execCommand
-            if (navigator.clipboard && window.isSecureContext) {
-                await navigator.clipboard.writeText(text);
-            }
-            else {
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed';
-                ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                ta.focus();
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-            }
-            alert('Лог скопирован в буфер обмена');
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast(`✓ Скопировано ${lines.length} записей`);
         }
         catch {
-            alert('Не удалось скопировать лог');
+            showToast('✗ Ошибка копирования');
         }
     };
     return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: C.surfaceAlt }, children: [_jsxs("header", { style: {
@@ -60,5 +58,11 @@ export default function Layout() {
                     boxShadow: '0 2px 8px rgba(0,0,0,.12)',
                     cursor: 'pointer', fontSize: 16,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }, children: "\uD83D\uDCCB" })] }));
+                }, children: "\uD83D\uDCCB" }), copyToast && (_jsx("div", { style: {
+                    position: 'fixed', bottom: 68, right: 16, zIndex: 501,
+                    background: C.text, color: '#fff', borderRadius: 8,
+                    padding: '8px 14px', fontSize: 13, fontWeight: 500,
+                    boxShadow: '0 4px 12px rgba(0,0,0,.2)',
+                    pointerEvents: 'none',
+                }, children: copyToast }))] }));
 }
