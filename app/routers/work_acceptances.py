@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -406,7 +406,7 @@ async def list_acceptance_items(
 async def set_acceptance_items(
     task_id: str,
     acc_id: str,
-    items: List[AcceptanceItemIn],
+    items: List[AcceptanceItemIn] = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

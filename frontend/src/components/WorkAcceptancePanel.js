@@ -73,7 +73,7 @@ export default function WorkAcceptancePanel({ taskId, items }) {
         return contractors.find((c) => c.id === id)?.name ?? id;
     }
     function nonHeaderItems() {
-        return items.filter((i) => i.row_type !== 'header' && i.row_type !== 'section');
+        return items.filter((i) => i.row_type !== 'section_header');
     }
     // ── Assignment actions ───────────────────────────────────────────────────────
     async function saveAssignment() {
@@ -194,8 +194,9 @@ export default function WorkAcceptancePanel({ taskId, items }) {
             const { data } = await client.get(`${base}/acceptances`);
             setAcceptances(data);
         }
-        catch {
-            alert('Ошибка сохранения позиций');
+        catch (e) {
+            const msg = e?.response?.data?.detail;
+            alert('Ошибка сохранения позиций' + (msg ? ': ' + msg : ''));
         }
         finally {
             setSavingItems(null);

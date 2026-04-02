@@ -145,7 +145,7 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
   }
 
   function nonHeaderItems() {
-    return items.filter((i) => i.row_type !== 'header' && i.row_type !== 'section');
+    return items.filter((i) => i.row_type !== 'section_header');
   }
 
   // ── Assignment actions ───────────────────────────────────────────────────────
@@ -265,8 +265,9 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
       // Refresh acceptances to update totals
       const { data } = await client.get<Acceptance[]>(`${base}/acceptances`);
       setAcceptances(data);
-    } catch {
-      alert('Ошибка сохранения позиций');
+    } catch (e: unknown) {
+      const msg = (e as {response?: {data?: {detail?: string}}})?.response?.data?.detail;
+      alert('Ошибка сохранения позиций' + (msg ? ': ' + msg : ''));
     } finally {
       setSavingItems(null);
     }
