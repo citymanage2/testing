@@ -229,9 +229,9 @@ async def list_acceptances(
         )
         items_count = count_result.scalar_one() or 0
 
-        # Total accepted value = sum(quantity_accepted * unit_price) joined with estimate_items
+        # Total accepted value = sum(quantity_accepted * (work_price + mat_price)) joined with estimate_items
         value_result = await db.execute(
-            select(func.coalesce(func.sum(WorkAcceptanceItem.quantity_accepted * EstimateItem.unit_price), 0.0))
+            select(func.coalesce(func.sum(WorkAcceptanceItem.quantity_accepted * (EstimateItem.work_price + EstimateItem.mat_price)), 0.0))
             .join(EstimateItem, WorkAcceptanceItem.estimate_item_id == EstimateItem.id)
             .where(WorkAcceptanceItem.acceptance_id == acc.id)
         )
@@ -347,7 +347,7 @@ async def patch_acceptance(
     items_count = count_result.scalar_one() or 0
 
     value_result = await db.execute(
-        select(func.coalesce(func.sum(WorkAcceptanceItem.quantity_accepted * EstimateItem.unit_price), 0.0))
+        select(func.coalesce(func.sum(WorkAcceptanceItem.quantity_accepted * (EstimateItem.work_price + EstimateItem.mat_price)), 0.0))
         .join(EstimateItem, WorkAcceptanceItem.estimate_item_id == EstimateItem.id)
         .where(WorkAcceptanceItem.acceptance_id == acc.id)
     )

@@ -26,7 +26,7 @@ interface Payment { id: string; direction: string; amount: number; paid_at: stri
 interface FinSummary { budget_planned?: number; estimate_total: number; income_received: number; expenses_paid: number; balance: number; budget_remaining?: number; }
 interface Contractor { id: string; kind: string; name: string; }
 interface TaskInProject { id: string; task_type: string; status: string; estimate_status?: string; name?: string; created_at: string; }
-interface StageInfo { stage: string; stage_label: string; allowed_next_stages: {stage: string; label: string}[]; }
+interface StageInfo { stage: string; stage_label: string; allowed_next_stages: string[]; }
 
 const STAGE_ORDER = ['LEAD','ESTIMATION','OPTIMIZATION','APPROVAL','EXECUTION','HANDOVER','WARRANTY','CLOSED'];
 
@@ -140,14 +140,25 @@ export default function ProjectDetail() {
   const clientContractors = contractors.filter(c => c.kind === 'client');
   const stageBg = STAGE_COLORS[stageInfo?.stage || card.stage || 'LEAD'];
   const currentStage = stageInfo?.stage || card.stage || '';
-  const TABS: [TabType, string][] = [
-    ['info', '📋 Информация'], ['docs', '📁 Документы'], ['contracts', '📄 Договоры'],
-    ['schedule', '📅 ГПР'], ['acts', '✅ Акты КС-2'], ['purchases', '🛒 Закупки'],
-    ['gallery', `🖼 Фото (${card.gallery_count})`], ['finance', '💰 Финансы'],
+  const stageIdx = STAGE_ORDER.indexOf(currentStage);
+  const atLeast = (s: string) => stageIdx < 0 || stageIdx >= STAGE_ORDER.indexOf(s);
+
+  const ALL_TABS: [TabType, string][] = [
+    ['info',      '📋 Информация'],
+    ['docs',      '📁 Документы'],
     ['estimates', `📐 Сметы (${tasks.length})`],
-    ['kp', '📊 Оптимизация КП'],
-    ...((currentStage === 'WARRANTY' || currentStage === 'CLOSED') ? [['warranty', '🛡 Гарантия'] as [TabType, string]] : []),
+    ['finance',   '💰 Финансы'],
+    ['kp',        '📊 Оптимизация КП'],
+    ...(atLeast('ESTIMATION') ? [['schedule', '📅 ГПР'] as [TabType, string]] : []),
+    ...(atLeast('APPROVAL')   ? [['contracts', '📄 Договоры'] as [TabType, string]] : []),
+    ...(atLeast('EXECUTION')  ? [
+      ['acts',      '✅ Акты КС-2'],
+      ['purchases', '🛒 Закупки'],
+      ['gallery',   `🖼 Фото (${card.gallery_count})`],
+    ] as [TabType, string][] : []),
+    ...(atLeast('WARRANTY')   ? [['warranty', '🛡 Гарантия'] as [TabType, string]] : []),
   ];
+  const TABS = ALL_TABS;
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
@@ -237,7 +248,7 @@ export default function ProjectDetail() {
               const isCurrent = idx === currentIdx;
               const isFuture = idx > currentIdx;
               const suggestion = suggestions.find(s => s.stage === stage);
-              const isAllowed = stageInfo?.allowed_next_stages?.some(s => s.stage === stage);
+              const isAllowed = stageInfo?.allowed_next_stages?.includes(stage);
 
               return (
                 <div key={stage} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '8px 0', borderBottom: idx < STAGE_ORDER.length - 1 ? `1px solid ${C.border}` : 'none' }}>
@@ -426,7 +437,7 @@ export default function ProjectDetail() {
       {showStageModal && (
         <div style={OVERLAY}>
           <div style={{ ...MODAL, maxWidth: 400 }}>
-            <h3 style={{ margin: '0 0 14px', fontSize: 16 }}>Перейти на стадию: {STAGE_LABELS[pendingStage] || stageInfo?.allowed_next_stages.find(s => s.stage === pendingStage)?.label}</h3>
+            <h3 style={{ margin: '0 0 14px', fontSize: 16 }}>Перейти на стадию: {STAGE_LABELS[pendingStage]}</h3>
             <label style={LBL}>Причина перехода (необязательно)
               <textarea value={stageReason} onChange={e => setStageReason(e.target.value)} rows={3} style={{ ...INPUT, marginTop: 4, resize: 'vertical' }} />
             </label>
