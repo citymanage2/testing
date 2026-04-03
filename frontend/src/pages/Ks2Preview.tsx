@@ -178,7 +178,7 @@ export default function Ks2Preview() {
               </tr>
             </thead>
             <tbody>
-              {data.items.map((item) => (
+              {data.items.filter(item => item.total_val > 0).map((item) => (
                 <tr key={item.idx}>
                   <td style={{ ...cellStyle, textAlign: 'center' }}>{item.idx}</td>
                   <td style={cellStyle}>{item.name}</td>
