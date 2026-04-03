@@ -734,6 +734,99 @@ async def export_acceptance_ks2(
 
 
 # ---------------------------------------------------------------------------
+# KS-2 JSON preview data
+# ---------------------------------------------------------------------------
+
+class Ks2DataItem(BaseModel):
+    idx: int
+    name: str
+    unit: str
+    qty_contract: float
+    qty_accepted: float
+    unit_price: float
+    work_val: float
+    mat_val: float
+    total_val: float
+
+
+class Ks2Data(BaseModel):
+    act_number: str
+    period: str
+    contractor_name: str
+    items: List[Ks2DataItem]
+    total_work: float
+    total_mat: float
+    grand_total: float
+
+
+@router.get("/estimates/{task_id}/acceptances/{acc_id}/ks2-data", response_model=Ks2Data)
+async def get_ks2_data(
+    task_id: str,
+    acc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return all data needed to render a KS-2 act preview (JSON, no Excel generation)."""
+    await _get_estimate(task_id, current_user, db)
+    acc = await _get_acceptance(acc_id, task_id, db)
+
+    contractor = await db.get(Contractor, acc.contractor_id) if acc.contractor_id else None
+
+    wai_result = await db.execute(
+        select(WorkAcceptanceItem).where(WorkAcceptanceItem.acceptance_id == acc_id)
+    )
+    wai_rows = wai_result.scalars().all()
+
+    ei_ids = [w.estimate_item_id for w in wai_rows]
+    ei_map: dict = {}
+    if ei_ids:
+        ei_result = await db.execute(select(EstimateItem).where(EstimateItem.id.in_(ei_ids)))
+        for ei in ei_result.scalars().all():
+            ei_map[ei.id] = ei
+
+    rows = sorted(
+        [(w, ei_map[w.estimate_item_id]) for w in wai_rows if w.estimate_item_id in ei_map],
+        key=lambda x: (x[1].position or 0),
+    )
+
+    items: List[Ks2DataItem] = []
+    total_work = 0.0
+    total_mat = 0.0
+    for idx, (wai, ei) in enumerate(rows, start=1):
+        wp = float(ei.work_price or 0)
+        mp = float(ei.mat_price or 0)
+        qty = float(wai.quantity_accepted or 0)
+        eq = float(ei.quantity or 0)
+        work_val = round(qty * wp, 2)
+        mat_val = round(qty * mp, 2)
+        total_work += work_val
+        total_mat += mat_val
+        items.append(Ks2DataItem(
+            idx=idx,
+            name=ei.name or "",
+            unit=ei.unit or "",
+            qty_contract=eq,
+            qty_accepted=qty,
+            unit_price=round(wp + mp, 2),
+            work_val=work_val,
+            mat_val=mat_val,
+            total_val=round(work_val + mat_val, 2),
+        ))
+
+    period = f"{acc.period_start} – {acc.period_end}" if acc.period_start and acc.period_end else "—"
+
+    return Ks2Data(
+        act_number=acc.act_number or "1",
+        period=period,
+        contractor_name=contractor.name if contractor else "—",
+        items=items,
+        total_work=round(total_work, 2),
+        total_mat=round(total_mat, 2),
+        grand_total=round(total_work + total_mat, 2),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Acceptance progress
 # ---------------------------------------------------------------------------
 

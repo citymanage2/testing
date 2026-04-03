@@ -11,6 +11,7 @@ import Contractors from './pages/Contractors';
 import Catalog from './pages/Catalog';
 import RoomCalculator from './pages/RoomCalculator';
 import ProjectDetail from './pages/ProjectDetail';
+import Ks2Preview from './pages/Ks2Preview';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute />}>
+          <Route path="/ks2-preview/:taskId/:accId" element={<Ks2Preview />} />
           <Route element={<Layout />}>
             <Route path="/" element={<Navigate to="/task/create" replace />} />
             <Route path="/task/create" element={<TaskCreate />} />

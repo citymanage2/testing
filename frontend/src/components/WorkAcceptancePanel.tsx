@@ -712,29 +712,7 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
                     </button>
                     <button
                       style={btnOutline('sm')}
-                      onClick={async () => {
-                        try {
-                          const resp = await client.get(
-                            `${base}/acceptances/${acc.id}/export-ks2`,
-                            { responseType: 'blob' },
-                          );
-                          const url = URL.createObjectURL(resp.data as Blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `ks2_act_${acc.act_number}.xlsx`;
-                          a.click();
-                          URL.revokeObjectURL(url);
-                        } catch (e: unknown) {
-                          const blob = (e as { response?: { data?: Blob } })?.response?.data;
-                          if (blob instanceof Blob) {
-                            const txt = await blob.text().catch(() => '');
-                            try { const j = JSON.parse(txt); alert('Ошибка КС-2: ' + String(j.detail || txt).slice(0, 400)); }
-                            catch { alert('Ошибка генерации КС-2: ' + txt.slice(0, 400)); }
-                          } else {
-                            alert('Ошибка генерации КС-2');
-                          }
-                        }
-                      }}
+                      onClick={() => window.open(`/ks2-preview/${taskId}/${acc.id}`, '_blank')}
                     >
                       Создать КС-2
                     </button>
