@@ -594,6 +594,127 @@ async def delete_acceptance_item(
 
 
 # ---------------------------------------------------------------------------
+# KS-2 export for a work acceptance
+# ---------------------------------------------------------------------------
+
+@router.get("/estimates/{task_id}/acceptances/{acc_id}/export-ks2")
+async def export_acceptance_ks2(
+    task_id: str,
+    acc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate KS-2 Excel document for a work acceptance."""
+    from fastapi.responses import StreamingResponse
+    import io
+
+    await _get_estimate(task_id, current_user, db)
+    acc = await _get_acceptance(acc_id, task_id, db)
+
+    task = await db.get(Task, task_id)
+    contractor = await db.get(Contractor, acc.contractor_id) if acc.contractor_id else None
+
+    # Load acceptance items with estimate item data
+    items_result = await db.execute(
+        select(WorkAcceptanceItem, EstimateItem)
+        .join(EstimateItem, WorkAcceptanceItem.estimate_item_id == EstimateItem.id)
+        .where(WorkAcceptanceItem.acceptance_id == acc_id)
+        .order_by(EstimateItem.position)
+    )
+    rows = items_result.all()
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, Border, Side
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "КС-2"
+
+    thin = Side(style="thin")
+    brd = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    def cell(row, col, value="", bold=False, align="left", border=True):
+        c = ws.cell(row=row, column=col, value=value)
+        c.font = Font(name="Arial", size=10, bold=bold)
+        c.alignment = Alignment(horizontal=align, vertical="center", wrap_text=True)
+        if border:
+            c.border = brd
+        return c
+
+    # Title
+    ws.merge_cells("A1:I1")
+    ws["A1"] = "АКТ о приёмке выполненных работ (форма КС-2)"
+    ws["A1"].font = Font(name="Arial", size=13, bold=True)
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 30
+
+    # Info block
+    contractor_name = contractor.name if contractor else "—"
+    period = f"{acc.period_start} – {acc.period_end}" if acc.period_start and acc.period_end else "—"
+    ws.merge_cells("A2:I2")
+    ws["A2"] = f"Подрядчик: {contractor_name}   Акт №: {acc.act_number}   Период: {period}"
+    ws["A2"].font = Font(name="Arial", size=10)
+    ws["A2"].alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[2].height = 20
+
+    # Header row
+    headers = ["№", "Наименование работ", "Ед.изм.", "Кол-во по дог.", "Выполнено", "Цена за ед.", "Стоимость работ", "Стоимость матер.", "Итого"]
+    for col, h in enumerate(headers, start=1):
+        cell(3, col, h, bold=True, align="center")
+    ws.row_dimensions[3].height = 30
+
+    # Column widths
+    widths = [5, 40, 8, 12, 12, 12, 14, 14, 14]
+    for col, w in enumerate(widths, start=1):
+        ws.column_dimensions[chr(64 + col)].width = w
+
+    # Data rows
+    total_work = 0.0
+    total_mat = 0.0
+    for idx, (wai, ei) in enumerate(rows, start=1):
+        r = 3 + idx
+        unit_price = (ei.work_price + ei.mat_price)
+        work_val = wai.quantity_accepted * ei.work_price
+        mat_val = wai.quantity_accepted * ei.mat_price
+        total_val = work_val + mat_val
+        total_work += work_val
+        total_mat += mat_val
+
+        cell(r, 1, idx, align="center")
+        cell(r, 2, ei.name)
+        cell(r, 3, ei.unit, align="center")
+        cell(r, 4, ei.quantity, align="right")
+        cell(r, 5, wai.quantity_accepted, align="right")
+        cell(r, 6, round(unit_price, 2), align="right")
+        cell(r, 7, round(work_val, 2), align="right")
+        cell(r, 8, round(mat_val, 2), align="right")
+        cell(r, 9, round(total_val, 2), align="right")
+        ws.row_dimensions[r].height = 18
+
+    # Totals row
+    tr = 4 + len(rows)
+    ws.merge_cells(f"A{tr}:F{tr}")
+    c = ws.cell(row=tr, column=1, value="ИТОГО:")
+    c.font = Font(name="Arial", size=10, bold=True)
+    c.alignment = Alignment(horizontal="right", vertical="center")
+    cell(tr, 7, round(total_work, 2), bold=True, align="right")
+    cell(tr, 8, round(total_mat, 2), bold=True, align="right")
+    cell(tr, 9, round(total_work + total_mat, 2), bold=True, align="right")
+    ws.row_dimensions[tr].height = 20
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"ks2_act_{acc.act_number}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Acceptance progress
 # ---------------------------------------------------------------------------
 
@@ -614,7 +735,7 @@ async def get_acceptance_progress(
         select(EstimateItem)
         .where(
             EstimateItem.task_id == task_id,
-            EstimateItem.is_header == False,  # noqa: E712
+            EstimateItem.row_type != "section_header",
         )
         .order_by(EstimateItem.position)
     )

@@ -214,8 +214,16 @@ export default function EstimateView() {
   }
 
   async function saveStatus(val: string) {
+    if (!val) return;
+    const prev = estimateStatus;
     setEstimateStatus(val);
-    await client.patch(`/projects/estimates/${id}/status`, { status: val });
+    try {
+      await client.patch(`/projects/estimates/${id}/status`, { status: val });
+    } catch (e: unknown) {
+      setEstimateStatus(prev);
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      alert('Ошибка сохранения статуса' + (msg ? ': ' + msg : ''));
+    }
   }
 
   const changeEstimateStatus = async (newStatus: string) => {

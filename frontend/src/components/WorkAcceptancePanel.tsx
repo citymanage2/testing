@@ -712,9 +712,21 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
                     </button>
                     <button
                       style={btnOutline('sm')}
-                      onClick={() => {
-                        // Emit a custom event that the parent EstimateView can listen to
-                        window.dispatchEvent(new CustomEvent('generate-ks2', { detail: { acceptanceId: acc.id, taskId } }));
+                      onClick={async () => {
+                        try {
+                          const resp = await client.get(
+                            `${base}/acceptances/${acc.id}/export-ks2`,
+                            { responseType: 'blob' },
+                          );
+                          const url = URL.createObjectURL(resp.data as Blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `ks2_act_${acc.act_number}.xlsx`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        } catch {
+                          alert('Ошибка генерации КС-2');
+                        }
                       }}
                     >
                       Создать КС-2
