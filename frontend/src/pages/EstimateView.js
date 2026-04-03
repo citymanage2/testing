@@ -218,8 +218,18 @@ export default function EstimateView() {
         await client.patch(`/tasks/${id}/name`, { name: taskName });
     }
     async function saveStatus(val) {
+        if (!val)
+            return;
+        const prev = estimateStatus;
         setEstimateStatus(val);
-        await client.patch(`/projects/estimates/${id}/status`, { status: val });
+        try {
+            await client.patch(`/projects/estimates/${id}/status`, { status: val });
+        }
+        catch (e) {
+            setEstimateStatus(prev);
+            const msg = e?.response?.data?.detail;
+            alert('Ошибка сохранения статуса' + (msg ? ': ' + msg : ''));
+        }
     }
     const changeEstimateStatus = async (newStatus) => {
         try {
