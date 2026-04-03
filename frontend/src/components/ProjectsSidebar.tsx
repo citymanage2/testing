@@ -131,7 +131,10 @@ export default function ProjectsSidebar({ collapsed }: Props = {}) {
           {noProjectTasks.length === 0
             ? <EmptyMsg>Нет задач</EmptyMsg>
             : noProjectTasks.map(t => (
-              <TaskRow key={t.id} task={t} onNavigate={() => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`)} draggable />
+              <TaskRow key={t.id} task={t}
+                onNavigate={() => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`)}
+                onDelete={async () => { if (confirm('Удалить смету?')) { await client.delete(`/tasks/${t.id}`); setNoProjectTasks(prev => prev.filter(x => x.id !== t.id)); } }}
+                draggable />
             ))}
         </SideSection>
 
@@ -216,10 +219,13 @@ function SideSection({ label, count, open, onToggle, accent, children }: {
 }
 
 function TaskRow({ task: t, onNavigate, onDelete, draggable }: { task: TaskRef; onNavigate: () => void; onDelete?: () => void; draggable?: boolean; }) {
+  const [hovered, setHovered] = useState(false);
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, cursor: 'pointer', marginBottom: 1 }}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, cursor: 'pointer', marginBottom: 1, background: hovered ? C.surfaceAlt : 'transparent' }}
       draggable={draggable}
       onDragStart={draggable ? e => e.dataTransfer.setData('text/plain', t.id) : undefined}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       {draggable && <span style={{ color: C.textMuted, fontSize: 10, cursor: 'grab' }}>⠿</span>}
       <span onClick={onNavigate} style={{ flex: 1, fontSize: 12, color: C.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.name || TYPE_LABELS[t.task_type]}>
@@ -229,8 +235,7 @@ function TaskRow({ task: t, onNavigate, onDelete, draggable }: { task: TaskRef; 
       <span style={{ fontSize: 8, color: STATUS_COLOR[t.status] || C.textMuted, flexShrink: 0 }}>●</span>
       {onDelete && (
         <button onClick={e => { e.stopPropagation(); onDelete(); }}
-          style={{ padding: '1px 5px', fontSize: 10, background: 'transparent', color: C.textMuted, border: 'none', borderRadius: 3, cursor: 'pointer', flexShrink: 0, opacity: 0 }}
-          className="del-btn">✕</button>
+          style={{ padding: '1px 5px', fontSize: 10, background: 'transparent', color: C.danger, border: 'none', borderRadius: 3, cursor: 'pointer', flexShrink: 0, opacity: hovered ? 1 : 0 }}>✕</button>
       )}
     </div>
   );

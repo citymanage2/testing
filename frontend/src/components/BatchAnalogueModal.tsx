@@ -3,7 +3,7 @@ import client from '../api/client';
 import { C, btnPrimary, btnOutline, OVERLAY, MODAL } from '../ui';
 
 interface Item { id: string; name: string; type: string; }
-interface Analogue { id: string; name: string; price: number; unit: string; supplier: string; economy_pct: number; source_url: string | null; }
+interface Analogue { id: string; name: string; price: number; unit: string; supplier: string; economy_pct: number; source_url: string | null; diff?: string; match_pct?: number; }
 interface ItemResult { item: Item; analogues: Analogue[]; loading: boolean; error: string; selected: string | null; }
 
 interface Props {
@@ -90,7 +90,16 @@ export default function BatchAnalogueModal({ taskId, items, onClose, onApplied }
                       <div style={{ fontSize: 12, color: C.textSec, marginTop: 2 }}>
                         {fmt(a.price)} ₽/{a.unit} · {a.supplier}
                         {a.economy_pct > 0 && <span style={{ marginLeft: 8, color: C.success, fontWeight: 600 }}>−{a.economy_pct.toFixed(1)}%</span>}
+                        {a.match_pct && <span style={{ marginLeft: 8, color: C.textMuted }}>совпадение {a.match_pct}%</span>}
                       </div>
+                      {a.diff && <div style={{ fontSize: 11, color: C.textSec, marginTop: 3, fontStyle: 'italic' }}>{a.diff}</div>}
+                      {a.source_url && (
+                        <a href={a.source_url} target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: 11, color: C.primary, marginTop: 2, display: 'block' }}
+                          onClick={e => e.stopPropagation()}>
+                          🔗 {a.source_url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
+                        </a>
+                      )}
                     </div>
                   </div>
                 ))}

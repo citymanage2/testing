@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import client from '../api/client';
 
-interface Analogue { id: string; name: string; price: number; unit: string; supplier: string; economy_pct: number; source_url: string | null; }
+interface Analogue { id: string; name: string; price: number; unit: string; supplier: string; economy_pct: number; source_url: string | null; diff?: string; match_pct?: number; }
 
 export default function AnaloguePanel({ taskId, itemId, isAnalogue, onClose, onApplied }: { taskId: string; itemId: string; isAnalogue: boolean; onClose: () => void; onApplied: () => void; }) {
   const [analogues, setAnalogues] = useState<Analogue[]>([]);
@@ -53,12 +53,14 @@ export default function AnaloguePanel({ taskId, itemId, isAnalogue, onClose, onA
         {analogues.map((a) => (
           <div key={a.id} style={{ border: '1px solid #e0e0e0', borderRadius: 6, padding: '12px 14px', marginBottom: 10 }}>
             <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{a.name}</div>
-            <div style={{ fontSize: 13, color: '#555', marginBottom: 6 }}>
+            <div style={{ fontSize: 13, color: '#555', marginBottom: 4 }}>
               {a.price.toLocaleString('ru-RU')} ₽ / {a.unit} — {a.supplier}
-              <span style={{ marginLeft: 8, color: a.economy_pct > 0 ? '#4caf50' : '#f44336', fontWeight: 600 }}>{a.economy_pct.toFixed(1)}%</span>
+              {a.economy_pct > 0 && <span style={{ marginLeft: 8, color: '#4caf50', fontWeight: 600 }}>−{a.economy_pct.toFixed(1)}%</span>}
+              {a.match_pct && <span style={{ marginLeft: 8, color: '#888', fontSize: 12 }}>совпадение {a.match_pct}%</span>}
             </div>
+            {a.diff && <div style={{ fontSize: 12, color: '#666', fontStyle: 'italic', marginBottom: 6 }}>{a.diff}</div>}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {a.source_url && <a href={a.source_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#1565c0' }}>Источник ↗</a>}
+              {a.source_url && <a href={a.source_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#1565c0' }}>🔗 {a.source_url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]} ↗</a>}
               <button onClick={() => apply(a.id)} disabled={applying === a.id} style={{ marginLeft: 'auto', padding: '5px 14px', background: applying === a.id ? '#bdbdbd' : '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}>
                 {applying === a.id ? '...' : 'Применить'}
               </button>

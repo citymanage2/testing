@@ -41,8 +41,8 @@ interface Acceptance {
 }
 
 interface ProgressItem {
-  estimate_item_id: string;
-  name: string;
+  item_id: string;
+  item_name: string;
   unit: string;
   quantity_total: number;
   quantity_accepted: number;
@@ -773,8 +773,8 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
                   const pct = Math.min(100, Math.max(0, p.pct_complete));
                   const barColor = pct >= 100 ? C.success : pct > 0 ? C.warning : C.textMuted;
                   return (
-                    <tr key={p.estimate_item_id}>
-                      <td style={TD}>{p.name}</td>
+                    <tr key={p.item_id}>
+                      <td style={TD}>{p.item_name}</td>
                       <td style={{ ...TD, textAlign: 'center', color: C.textSec }}>{p.unit}</td>
                       <td style={{ ...TD, textAlign: 'right' }}>{p.quantity_total}</td>
                       <td style={{ ...TD, textAlign: 'right' }}>{p.quantity_accepted}</td>
