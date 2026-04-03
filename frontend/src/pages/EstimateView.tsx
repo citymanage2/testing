@@ -227,14 +227,14 @@ export default function EstimateView() {
   }
 
   const changeEstimateStatus = async (newStatus: string) => {
+    const prev = estimateStatus;
+    setEstimateStatus(newStatus);
     try {
-      await client.post(`/projects/estimates/${id}/status-log`, {
-        status: newStatus,
-        reason: '',
-      });
-      setEstimateStatus(newStatus);
-    } catch {
-      alert('Ошибка смены статуса сметы');
+      await client.patch(`/projects/estimates/${id}/status`, { status: newStatus });
+    } catch (e: unknown) {
+      setEstimateStatus(prev);
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      alert('Ошибка смены статуса сметы' + (msg ? ': ' + msg : ''));
     }
   };
 
