@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user, CurrentUser
 from app.database import get_db
 from app.models.project import Project
+from app.models.task import Task
 from app.models.kp_request import KpRequest
 from app.models.contractor import Contractor
 from app.models.estimate_item import EstimateItem
@@ -62,6 +63,45 @@ async def _get_project(project_id: str, user_id: str, db: AsyncSession) -> Proje
     if not project or project.user_id != user_id:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+@router.get("/{project_id}/kp-estimate-items")
+async def get_kp_estimate_items(
+    project_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all estimate items for all tasks in this project, grouped by task/section."""
+    await _get_project(project_id, current_user.id, db)
+    tasks_r = await db.execute(
+        select(Task).where(Task.project_id == project_id).order_by(Task.created_at)
+    )
+    tasks = tasks_r.scalars().all()
+    if not tasks:
+        return []
+    task_ids = [t.id for t in tasks]
+    task_map = {t.id: t for t in tasks}
+    items_r = await db.execute(
+        select(EstimateItem).where(
+            EstimateItem.task_id.in_(task_ids),
+            EstimateItem.row_type != "section_header",
+        ).order_by(EstimateItem.task_id, EstimateItem.sort_order, EstimateItem.position)
+    )
+    items = items_r.scalars().all()
+    result = []
+    for item in items:
+        t = task_map.get(item.task_id)
+        result.append({
+            "id": item.id,
+            "task_id": item.task_id,
+            "task_name": t.title if t else "",
+            "section": item.section or "",
+            "name": item.name or "",
+            "unit": item.unit or "",
+            "quantity": float(item.quantity or 0),
+            "row_type": item.row_type or "work",
+        })
+    return result
 
 
 @router.get("/{project_id}/kp-requests", response_model=List[KpRequestOut])
