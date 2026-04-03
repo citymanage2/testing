@@ -296,8 +296,21 @@ export default function WorkAcceptancePanel({ taskId, items }) {
                                                             a.click();
                                                             URL.revokeObjectURL(url);
                                                         }
-                                                        catch {
-                                                            alert('Ошибка генерации КС-2');
+                                                        catch (e) {
+                                                            const blob = e?.response?.data;
+                                                            if (blob instanceof Blob) {
+                                                                const txt = await blob.text().catch(() => '');
+                                                                try {
+                                                                    const j = JSON.parse(txt);
+                                                                    alert('Ошибка КС-2: ' + String(j.detail || txt).slice(0, 400));
+                                                                }
+                                                                catch {
+                                                                    alert('Ошибка генерации КС-2: ' + txt.slice(0, 400));
+                                                                }
+                                                            }
+                                                            else {
+                                                                alert('Ошибка генерации КС-2');
+                                                            }
                                                         }
                                                     }, children: "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u041A\u0421-2" })] })] }))] }, acc.id));
                     })] }), _jsxs("div", { style: CARD, children: [_jsx("div", { style: { ...sectionTitle, marginBottom: 14 }, children: _jsx("span", { children: "\u041F\u0440\u043E\u0433\u0440\u0435\u0441\u0441 \u043F\u043E \u043F\u043E\u0437\u0438\u0446\u0438\u044F\u043C" }) }), progress.length === 0 ? (_jsx("p", { style: { fontSize: 13, color: C.textMuted, margin: 0 }, children: "\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u043E \u043F\u0440\u043E\u0433\u0440\u0435\u0441\u0441\u0435" })) : (_jsx("div", { style: { overflow: 'hidden' }, children: _jsxs("table", { style: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }, children: [_jsxs("colgroup", { children: [_jsx("col", {}), _jsx("col", { style: { width: 52 } }), _jsx("col", { style: { width: 80 } }), _jsx("col", { style: { width: 80 } }), _jsx("col", { style: { width: 80 } }), _jsx("col", { style: { width: 120 } })] }), _jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { style: { ...TH }, children: "\u041D\u0430\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u043D\u0438\u0435" }), _jsx("th", { style: { ...TH, textAlign: 'center' }, children: "\u0415\u0434." }), _jsx("th", { style: { ...TH, textAlign: 'right' }, children: "\u041F\u043E \u0441\u043C\u0435\u0442\u0435" }), _jsx("th", { style: { ...TH, textAlign: 'right' }, children: "\u041F\u0440\u0438\u043D\u044F\u0442\u043E" }), _jsx("th", { style: { ...TH, textAlign: 'right' }, children: "\u041E\u0441\u0442\u0430\u0442\u043E\u043A" }), _jsx("th", { style: { ...TH }, children: "\u041F\u0440\u043E\u0433\u0440\u0435\u0441\u0441" })] }) }), _jsx("tbody", { children: progress.map((p) => {

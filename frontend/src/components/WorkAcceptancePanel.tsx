@@ -724,8 +724,15 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
                           a.download = `ks2_act_${acc.act_number}.xlsx`;
                           a.click();
                           URL.revokeObjectURL(url);
-                        } catch {
-                          alert('Ошибка генерации КС-2');
+                        } catch (e: unknown) {
+                          const blob = (e as { response?: { data?: Blob } })?.response?.data;
+                          if (blob instanceof Blob) {
+                            const txt = await blob.text().catch(() => '');
+                            try { const j = JSON.parse(txt); alert('Ошибка КС-2: ' + String(j.detail || txt).slice(0, 400)); }
+                            catch { alert('Ошибка генерации КС-2: ' + txt.slice(0, 400)); }
+                          } else {
+                            alert('Ошибка генерации КС-2');
+                          }
                         }
                       }}
                     >
