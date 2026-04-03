@@ -425,10 +425,21 @@ export default function ProjectDetail() {
           {tasks.length === 0
             ? <div style={{ ...CARD, padding: 40, textAlign: 'center', color: C.textMuted }}>Нет смет в проекте</div>
             : tasks.map(t => (
-              <Link key={t.id} to={`/task/${t.id}/estimate`} style={{ display: 'block', padding: '10px 14px', border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 8, textDecoration: 'none', color: 'inherit', background: C.surfaceAlt }}>
-                <div style={{ fontWeight: 500, color: C.text }}>{(t as any).name || `Смета ${t.id.slice(0, 8)}`}</div>
-                <div style={{ fontSize: 12, color: C.textSec, marginTop: 2 }}>Статус: {t.estimate_status || 'не указан'} · {new Date(t.created_at).toLocaleDateString('ru-RU')}</div>
-              </Link>
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <Link to={`/task/${t.id}/estimate`} style={{ flex: 1, display: 'block', padding: '10px 14px', border: `1px solid ${C.border}`, borderRadius: 8, textDecoration: 'none', color: 'inherit', background: C.surfaceAlt }}>
+                  <div style={{ fontWeight: 500, color: C.text }}>{(t as any).name || `Смета ${t.id.slice(0, 8)}`}</div>
+                  <div style={{ fontSize: 12, color: C.textSec, marginTop: 2 }}>Статус: {t.estimate_status || 'не указан'} · {new Date(t.created_at).toLocaleDateString('ru-RU')}</div>
+                </Link>
+                <button
+                  onClick={async () => {
+                    if (!confirm('Удалить смету?')) return;
+                    try { await client.delete(`/tasks/${t.id}`); setTasks(prev => prev.filter(x => x.id !== t.id)); }
+                    catch { alert('Ошибка удаления'); }
+                  }}
+                  style={{ padding: '6px 10px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
+                  title="Удалить смету"
+                >✕</button>
+              </div>
             ))}
         </div>
       )}

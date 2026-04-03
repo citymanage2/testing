@@ -9,6 +9,7 @@ import DocumentGenerator from '../components/DocumentGenerator';
 import WorkAcceptancePanel from '../components/WorkAcceptancePanel';
 import AiAssistModal from '../components/AiAssistModal';
 import { C, btnPrimary, btnOutline, btnDanger, btnGhost, INPUT, LBL, CARD, TH, TD, OVERLAY, MODAL } from '../ui';
+import BatchAnalogueModal from '../components/BatchAnalogueModal';
 
 interface Item {
   id: string; position: number; section: string; type: string; name: string;
@@ -84,6 +85,7 @@ export default function EstimateView() {
   const [batchSectionTarget, setBatchSectionTarget] = useState('');
   const [showBatchCoeff, setShowBatchCoeff] = useState(false);
   const [batchCoeff, setBatchCoeff] = useState('1');
+  const [showBatchAnalogue, setShowBatchAnalogue] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [activeTab, setActiveTab] = useState<'estimate' | 'acceptance' | 'docs'>('estimate');
   const [showAiAssist, setShowAiAssist] = useState(false);
@@ -313,6 +315,15 @@ export default function EstimateView() {
     } catch { alert('Ошибка сохранения в каталог'); }
   }
 
+  async function batchSaveToCatalog() {
+    const ids = Array.from(selectedIds);
+    for (const itemId of ids) {
+      try { await client.post(`/catalog/from-estimate-item/${itemId}`); } catch {}
+    }
+    alert(`${ids.length} позиций добавлено в прайс`);
+    setSelectedIds(new Set());
+  }
+
   function handleDragStart(e: React.DragEvent, itemId: string) {
     setDragItemId(itemId);
     e.dataTransfer.effectAllowed = 'move';
@@ -388,7 +399,7 @@ export default function EstimateView() {
   const grandTotal = grandBase + grandVat;
 
   return (
-    <div style={fullscreen ? { position: 'fixed', inset: 0, zIndex: 200, overflowY: 'auto', background: C.surfaceAlt, padding: '16px 20px' } : { padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={fullscreen ? { position: 'fixed', inset: 0, zIndex: 200, overflowY: 'auto', background: C.surfaceAlt, padding: '16px 20px' } : { padding: '0 0 16px 0' }}>
       {/* ── Page header ───────────────────────────────────────────────── */}
       <div style={{ ...CARD, marginBottom: 16, padding: '16px 20px' }}>
         {/* Title row */}
@@ -492,6 +503,21 @@ export default function EstimateView() {
           <button onClick={batchDelete} style={btnDanger('sm')}>✕ Удалить</button>
           <button onClick={() => { setBatchSectionTarget(''); setShowBatchSection(true); }} style={btnOutline('sm')}>↗ В раздел</button>
           <button onClick={() => { setBatchCoeff('1'); setShowBatchCoeff(true); }} style={btnOutline('sm')}>× Коэффициент</button>
+          <button
+            onClick={() => setShowBatchAnalogue(true)}
+            disabled={data.items.filter(i => selectedIds.has(i.id) && i.type === 'Материал').length === 0}
+            style={{ ...btnOutline('sm'), opacity: data.items.filter(i => selectedIds.has(i.id) && i.type === 'Материал').length === 0 ? 0.4 : 1 }}
+            title="Подобрать аналоги для выбранных материалов"
+          >
+            🔍 Аналоги
+          </button>
+          <button
+            onClick={batchSaveToCatalog}
+            style={btnOutline('sm')}
+            title="Добавить выбранные позиции в прайс-лист"
+          >
+            📋 В прайс
+          </button>
           <button onClick={() => setSelectedIds(new Set())} style={btnGhost('sm')}>Снять выделение</button>
         </div>
       )}
@@ -597,7 +623,7 @@ export default function EstimateView() {
           <colgroup>
             <col style={{ width: 28 }} />
             <col style={{ width: 36 }} />
-            <col style={{ width: 56 }} />
+            <col style={{ width: 40 }} />
             <col />
             <col style={{ width: 44 }} />
             <col style={{ width: 66 }} />
@@ -646,7 +672,15 @@ export default function EstimateView() {
                         <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
                       </td>
                       <td style={TD}>{item.position}</td>
-                      <td style={TD}>{item.type}</td>
+                      <td style={{ ...TD, textAlign: 'center', padding: '4px 2px' }}>
+                        <span style={{
+                          display: 'inline-block', padding: '1px 5px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                          background: item.type === 'Работа' ? '#dbeafe' : '#d1fae5',
+                          color: item.type === 'Работа' ? '#1d4ed8' : '#065f46',
+                        }}>
+                          {item.type === 'Работа' ? 'Р' : 'М'}
+                        </span>
+                      </td>
                       <td style={{ ...TD, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {item.name}
                         {item.is_analogue && <span style={{ marginLeft: 6, padding: '1px 5px', background: C.success, color: '#fff', borderRadius: 10, fontSize: 10 }}>аналог</span>}
@@ -659,9 +693,6 @@ export default function EstimateView() {
                       <td style={TD}>{fmt(item.total)}</td>
                       <td style={TD}>
                         <div style={{ display: 'flex', gap: 4 }}>
-                          {item.type === 'Материал' && (
-                            <button onClick={() => setAnalogueItemId(item.id)} style={{ padding: '2px 8px', background: C.primaryBg, color: C.primary, border: `1px solid ${C.primary}33`, borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Аналоги</button>
-                          )}
                           <button onClick={() => saveItemToCatalog(item.id)} title="Сохранить в каталог" style={{ padding: '2px 7px', background: C.successBg, color: C.success, border: `1px solid ${C.success}40`, borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>📋</button>
                           <button onClick={() => deleteItem(item.id)} disabled={isLocked} style={{ padding: '2px 6px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 4, cursor: 'pointer', fontSize: 11, opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>✕</button>
                         </div>
@@ -849,6 +880,14 @@ export default function EstimateView() {
       {showOpt && id && <OptimizationChecklist taskId={id} onClose={() => setShowOpt(false)} onOptimized={() => { setShowOpt(false); load(); }} />}
       {analogueItemId && id && analogueItem && <AnaloguePanel taskId={id} itemId={analogueItemId} isAnalogue={analogueItem.is_analogue} onClose={() => setAnalogueItemId(null)} onApplied={() => { setAnalogueItemId(null); load(); }} />}
       {showAiAssist && id && <AiAssistModal taskId={id} onClose={() => setShowAiAssist(false)} />}
+      {showBatchAnalogue && id && data && (
+        <BatchAnalogueModal
+          taskId={id}
+          items={data.items.filter(i => selectedIds.has(i.id) && i.type === 'Материал')}
+          onClose={() => setShowBatchAnalogue(false)}
+          onApplied={() => { setShowBatchAnalogue(false); setSelectedIds(new Set()); load(); }}
+        />
+      )}
       <input ref={importRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleImport} />
     </div>
   );

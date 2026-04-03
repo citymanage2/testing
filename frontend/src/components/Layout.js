@@ -124,7 +124,7 @@ export default function Layout() {
                                                     display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                                                     padding: '9px 16px', border: 'none', background: C.surface,
                                                     color: C.danger, cursor: 'pointer', fontSize: 13,
-                                                }, children: "\u21A9 \u0412\u044B\u0439\u0442\u0438" })] }))] })] }), _jsx("main", { style: { flex: 1, overflowY: 'auto', overflowX: 'hidden', background: C.pageBg, padding: 20 }, children: _jsx(Outlet, {}) })] }), copyToast && (_jsx("div", { style: {
+                                                }, children: "\u21A9 \u0412\u044B\u0439\u0442\u0438" })] }))] })] }), _jsx("main", { style: { flex: 1, overflowY: 'auto', overflowX: 'hidden', background: C.pageBg, padding: '12px 4px' }, children: _jsx(Outlet, {}) })] }), copyToast && (_jsx("div", { style: {
                     position: 'fixed', bottom: 24, right: 24, zIndex: 501,
                     background: C.text, color: '#fff', borderRadius: 8,
                     padding: '8px 14px', fontSize: 13, fontWeight: 500,
