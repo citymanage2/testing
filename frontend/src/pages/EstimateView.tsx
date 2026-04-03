@@ -34,7 +34,7 @@ const ESTIMATE_STATUS_TRANSITIONS: Record<string, string[]> = {
   draft: ['internal_review'],
   internal_review: ['draft', 'frozen'],
   frozen: ['internal_review', 'signed'],
-  signed: [],   // LOCKED - cannot transition away
+  signed: ['frozen', 'internal_review'],
   archived: [],
 };
 

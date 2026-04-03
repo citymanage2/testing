@@ -103,8 +103,6 @@ async def update_estimate_status(task_id: str, body: EstimateStatusUpdate, curre
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if task.estimate_status == "signed":
-        raise HTTPException(status_code=403, detail="Подписанная смета не может быть изменена")
     task.estimate_status = body.status
     task.estimate_status_updated_at = datetime.now(timezone.utc)
     task.estimate_status_updated_by = body.updated_by

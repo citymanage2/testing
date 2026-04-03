@@ -22,7 +22,7 @@ const ESTIMATE_STATUS_TRANSITIONS = {
     draft: ['internal_review'],
     internal_review: ['draft', 'frozen'],
     frozen: ['internal_review', 'signed'],
-    signed: [], // LOCKED - cannot transition away
+    signed: ['frozen', 'internal_review'],
     archived: [],
 };
 const DOC_TYPES = ['Смета', 'ТЗ', 'Проект', 'Дефектная ведомость', 'Акт выполненных работ', 'КС-2', 'КС-3', 'Локальный сметный расчёт', 'Другое'];
