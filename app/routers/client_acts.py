@@ -311,6 +311,14 @@ async def replace_act_items(
                 status_code=400,
                 detail=f"Estimate item {line.estimate_item_id} not found",
             )
+        # Ensure the item belongs to a CLIENT (not subcontractor) estimate
+        source_task = await db.get(Task, est_item.task_id)
+        if source_task and getattr(source_task, "estimate_type", None) == "subcontractor":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Позиция '{est_item.name}' принадлежит смете субподрядчика. "
+                       "КС-2 с заказчиком заполняется только по клиентской смете.",
+            )
 
         # Sum from other non-cancelled acts (exclude current act)
         already_result = await db.execute(
@@ -416,11 +424,15 @@ async def actioning_summary(
 ):
     await _get_project_owned(project_id, current_user.id, db)
 
-    # Get tasks for this project
+    # Get only CLIENT (non-subcontractor) tasks for this project
     tasks_result = await db.execute(
         select(Task).where(Task.project_id == project_id)
     )
-    task_ids = [t.id for t in tasks_result.scalars().all()]
+    client_tasks = [
+        t for t in tasks_result.scalars().all()
+        if getattr(t, "estimate_type", None) != "subcontractor"
+    ]
+    task_ids = [t.id for t in client_tasks]
 
     if not task_ids:
         return []
