@@ -123,7 +123,7 @@ export default function ProjectsSidebar({ collapsed } = {}) {
                             : noProjectTasks.map(t => (_jsx(TaskRow, { task: t, onNavigate: () => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`), onDelete: async () => { if (confirm('Удалить смету?')) {
                                     await client.delete(`/tasks/${t.id}`);
                                     setNoProjectTasks(prev => prev.filter(x => x.id !== t.id));
-                                } }, draggable: true }, t.id))) }), projects.length === 0
+                                } }, onRename: load, draggable: true }, t.id))) }), projects.length === 0
                         ? _jsx(EmptyMsg, { children: "\u041D\u0435\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432" })
                         : projects.map(p => (_jsxs("div", { style: { marginBottom: 2 }, children: [_jsxs("div", { onClick: () => toggleProject(p.id), onDragOver: e => { e.preventDefault(); setDragOver(p.id); }, onDragLeave: () => setDragOver(null), onDrop: e => handleDrop(p.id, e), style: {
                                         display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px',
@@ -137,7 +137,7 @@ export default function ProjectsSidebar({ collapsed } = {}) {
                                                     : detail.tasks.map(t => (_jsx(TaskRow, { task: t, onNavigate: () => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`), onDelete: async () => { if (confirm('Удалить смету?')) {
                                                             await client.delete(`/tasks/${t.id}`);
                                                             refreshDetail(p.id);
-                                                        } } }, t.id)))] })) }))] }, p.id)))] }), _jsx("input", { ref: importRef, type: "file", accept: ".xlsx", style: { display: 'none' }, onChange: handleImport })] }));
+                                                        } }, onRename: () => refreshDetail(p.id) }, t.id)))] })) }))] }, p.id)))] }), _jsx("input", { ref: importRef, type: "file", accept: ".xlsx", style: { display: 'none' }, onChange: handleImport })] }));
 }
 function SideSection({ label, count, open, onToggle, accent, children }) {
     return (_jsxs("div", { style: { marginBottom: 8 }, children: [_jsxs("div", { onClick: onToggle, style: {
@@ -147,9 +147,31 @@ function SideSection({ label, count, open, onToggle, accent, children }) {
                     border: `1px solid ${accent ? C.warning + '40' : C.border}`,
                 }, children: [_jsx("span", { style: { fontSize: 10, color: accent ? C.warning : C.textMuted }, children: open ? '▼' : '▶' }), _jsx("span", { style: { flex: 1, fontSize: 13, fontWeight: 600, color: accent ? C.warning : C.text }, children: label }), count > 0 && _jsx("span", { style: { fontSize: 11, padding: '1px 7px', borderRadius: 99, background: accent ? C.warning + '20' : C.border, color: accent ? C.warning : C.textSec, fontWeight: 600 }, children: count })] }), open && _jsx("div", { style: { paddingTop: 2 }, children: children })] }));
 }
-function TaskRow({ task: t, onNavigate, onDelete, draggable }) {
+function TaskRow({ task: t, onNavigate, onDelete, onRename, draggable }) {
     const [hovered, setHovered] = useState(false);
-    return (_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, cursor: 'pointer', marginBottom: 1, background: hovered ? C.surfaceAlt : 'transparent' }, draggable: draggable, onDragStart: draggable ? e => e.dataTransfer.setData('text/plain', t.id) : undefined, onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false), children: [draggable && _jsx("span", { style: { color: C.textMuted, fontSize: 10, cursor: 'grab' }, children: "\u283F" }), _jsxs("span", { onClick: onNavigate, style: { flex: 1, fontSize: 12, color: C.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, title: t.name || TYPE_LABELS[t.task_type], children: [t.name || TYPE_LABELS[t.task_type] || t.task_type, t.doc_type && _jsxs("span", { style: { marginLeft: 4, fontSize: 10, color: C.textMuted }, children: ["[", t.doc_type, "]"] })] }), _jsx("span", { style: { fontSize: 8, color: STATUS_COLOR[t.status] || C.textMuted, flexShrink: 0 }, children: "\u25CF" }), onDelete && (_jsx("button", { onClick: e => { e.stopPropagation(); onDelete(); }, style: { padding: '1px 5px', fontSize: 10, background: 'transparent', color: C.danger, border: 'none', borderRadius: 3, cursor: 'pointer', flexShrink: 0, opacity: hovered ? 1 : 0 }, children: "\u2715" }))] }));
+    const [renaming, setRenaming] = useState(false);
+    const [renameVal, setRenameVal] = useState('');
+    function startRename(e) {
+        e.stopPropagation();
+        setRenameVal(t.name || TYPE_LABELS[t.task_type] || '');
+        setRenaming(true);
+    }
+    async function commitRename() {
+        setRenaming(false);
+        if (renameVal.trim()) {
+            try {
+                await client.patch(`/tasks/${t.id}/name`, { name: renameVal.trim() });
+                onRename?.();
+            }
+            catch { }
+        }
+    }
+    if (renaming) {
+        return (_jsx("div", { style: { display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, marginBottom: 1, background: C.primaryBg }, children: _jsx("input", { autoFocus: true, value: renameVal, onChange: e => setRenameVal(e.target.value), onBlur: commitRename, onKeyDown: e => { if (e.key === 'Enter')
+                    commitRename(); if (e.key === 'Escape')
+                    setRenaming(false); }, style: { flex: 1, fontSize: 12, padding: '2px 4px', border: `1px solid ${C.primary}`, borderRadius: 3, outline: 'none' } }) }));
+    }
+    return (_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, cursor: 'pointer', marginBottom: 1, background: hovered ? C.surfaceAlt : 'transparent' }, draggable: draggable, onDragStart: draggable ? e => e.dataTransfer.setData('text/plain', t.id) : undefined, onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false), children: [draggable && _jsx("span", { style: { color: C.textMuted, fontSize: 10, cursor: 'grab' }, children: "\u283F" }), _jsxs("span", { onClick: onNavigate, onDoubleClick: startRename, style: { flex: 1, fontSize: 12, color: C.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, title: (t.name || TYPE_LABELS[t.task_type]) + ' (двойной клик — переименовать)', children: [t.name || TYPE_LABELS[t.task_type] || t.task_type, t.doc_type && _jsxs("span", { style: { marginLeft: 4, fontSize: 10, color: C.textMuted }, children: ["[", t.doc_type, "]"] })] }), _jsx("span", { style: { fontSize: 8, color: STATUS_COLOR[t.status] || C.textMuted, flexShrink: 0 }, children: "\u25CF" }), onDelete && (_jsx("button", { onClick: e => { e.stopPropagation(); onDelete(); }, style: { padding: '1px 5px', fontSize: 10, background: 'transparent', color: C.danger, border: 'none', borderRadius: 3, cursor: 'pointer', flexShrink: 0, opacity: hovered ? 1 : 0 }, children: "\u2715" }))] }));
 }
 function EmptyMsg({ children }) {
     return _jsx("p", { style: { color: C.textMuted, fontSize: 12, margin: '4px 10px', fontStyle: 'italic' }, children: children });
