@@ -382,3 +382,100 @@ async def schedule_summary(
             )
         )
     return result
+
+
+@router.get("/{project_id}/schedule/export-excel")
+async def export_schedule_excel(
+    project_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Export GPR (work schedule) to Excel."""
+    import io
+    from fastapi.responses import StreamingResponse
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+
+    # verify project ownership
+    project = await db.get(Project, project_id)
+    if not project or project.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Load schedule items with entries
+    items_result = await db.execute(
+        select(WorkScheduleItem)
+        .where(WorkScheduleItem.project_id == project_id)
+        .order_by(WorkScheduleItem.sort_order)
+    )
+    items = items_result.scalars().all()
+
+    # Get all unique periods across all items
+    all_periods = set()
+    item_entries = {}
+    for item in items:
+        entries_result = await db.execute(
+            select(WorkScheduleEntry).where(WorkScheduleEntry.schedule_item_id == item.id)
+        )
+        entries = entries_result.scalars().all()
+        item_entries[item.id] = {e.period_label: e for e in entries}
+        for e in entries:
+            all_periods.add(e.period_label)
+    periods = sorted(all_periods)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "ГПР"
+
+    thin = Side(style="thin")
+    brd = Border(left=thin, right=thin, top=thin, bottom=thin)
+    header_fill = PatternFill("solid", fgColor="1565C0")
+
+    # Title
+    ws.merge_cells(f"A1:{chr(65 + 3 + len(periods))}1")
+    t = ws["A1"]
+    t.value = f"График производства работ — {project.name}"
+    t.font = Font(name="Arial", size=13, bold=True)
+    t.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 28
+
+    # Headers
+    headers = ["№", "Наименование", "Ед.", "Кол-во"] + periods
+    for col, h in enumerate(headers, 1):
+        c = ws.cell(row=2, column=col, value=h)
+        c.font = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+        c.fill = header_fill
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = brd
+    ws.row_dimensions[2].height = 32
+    ws.column_dimensions["A"].width = 5
+    ws.column_dimensions["B"].width = 40
+    ws.column_dimensions["C"].width = 8
+    ws.column_dimensions["D"].width = 10
+    for i, _ in enumerate(periods):
+        ws.column_dimensions[chr(69 + i)].width = 10
+
+    # Data rows
+    for idx, item in enumerate(items, 1):
+        r = 2 + idx
+        ws.cell(row=r, column=1, value=idx).border = brd
+        ws.cell(row=r, column=2, value=item.name).border = brd
+        ws.cell(row=r, column=3, value=item.unit or "").border = brd
+        ws.cell(row=r, column=4, value=float(item.total_quantity or 0)).border = brd
+        for pi, period in enumerate(periods):
+            entry = item_entries[item.id].get(period)
+            planned = float(entry.planned_qty or 0) if entry else 0
+            actual = float(entry.actual_qty or 0) if entry else 0
+            cell_val = f"П: {planned}" + (f"\nФ: {actual}" if actual else "")
+            c = ws.cell(row=r, column=5 + pi, value=cell_val)
+            c.border = brd
+            c.alignment = Alignment(wrap_text=True)
+        ws.row_dimensions[r].height = 30
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="gpr_{project_id}.xlsx"'},
+    )

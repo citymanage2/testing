@@ -28,5 +28,6 @@ class Project(Base):
     construction_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     sales_manager_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     project_manager_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    project_manager_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     contract_number: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     contract_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)

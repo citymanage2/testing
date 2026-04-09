@@ -20,6 +20,8 @@ export default function Catalog() {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: string[] } | null>(null);
+  const [dupCount, setDupCount] = useState<number | null>(null);
+  const [deletingDups, setDeletingDups] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
   async function load(q?: string) {
@@ -31,7 +33,25 @@ export default function Catalog() {
     setList(r.data);
   }
 
+  async function loadDupCount() {
+    try {
+      const r = await client.get<{ count: number }>('/catalog/duplicates/count');
+      setDupCount(r.data.count);
+    } catch { setDupCount(null); }
+  }
+
+  async function deleteDups() {
+    if (!confirm(`Удалить ${dupCount} дублирующих записей? Останется одна (последняя) версия каждой позиции.`)) return;
+    setDeletingDups(true);
+    try {
+      await client.delete('/catalog/duplicates');
+      await load(search || undefined);
+      await loadDupCount();
+    } finally { setDeletingDups(false); }
+  }
+
   useEffect(() => { load(search || undefined); }, [search, typeFilter]);
+  useEffect(() => { loadDupCount(); }, []);
 
   function openAdd() { setForm({ ...empty }); setEditId(null); setShowForm(true); }
   function openEdit(e: Entry) {
@@ -89,7 +109,13 @@ export default function Catalog() {
       <div style={{ ...CARD, padding: '16px 20px', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.text, flex: 1 }}>Корпоративный каталог расценок</h2>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            {dupCount !== null && dupCount > 0 && (
+              <button onClick={deleteDups} disabled={deletingDups}
+                style={{ ...btnDanger('sm'), display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                {deletingDups ? '⏳...' : `🗑 Дубликаты (${dupCount})`}
+              </button>
+            )}
             <button onClick={downloadTemplate} style={btnGhost('sm')} title="Скачать шаблон Excel">⬇ Шаблон</button>
             <label style={{ ...btnOutline('sm'), cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
               {importing ? '⏳ Импорт...' : '📥 Импорт Excel'}
