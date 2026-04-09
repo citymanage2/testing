@@ -157,7 +157,7 @@ export default function ProjectDetail() {
     ...(atLeast('ESTIMATION') ? [['schedule', '📅 ГПР'] as [TabType, string]] : []),
     ...(atLeast('APPROVAL')   ? [['contracts', '📄 Договоры'] as [TabType, string]] : []),
     ...(atLeast('EXECUTION')  ? [
-      ['acts',      '✅ Акты КС-2'],
+      ['acts',      '✅ КС-2 с заказчиком'],
       ['purchases', '🛒 Закупки'],
       ['gallery',   `🖼 Фото (${card.gallery_count})`],
     ] as [TabType, string][] : []),
@@ -533,51 +533,57 @@ export default function ProjectDetail() {
       {/* Subcontractor estimate modal */}
       {showSubModal && (
         <div style={OVERLAY}>
-          <div style={{ ...MODAL, maxWidth: 440 }}>
-            <h3 style={{ margin: '0 0 14px', fontSize: 16 }}>Создать субподрядную смету</h3>
+          <div style={{ ...MODAL, maxWidth: 480 }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 16 }}>Создать смету с подрядчиком</h3>
+            <p style={{ margin: '0 0 14px', fontSize: 13, color: C.textMuted }}>
+              Смета с подрядчиком создаётся на основании клиентской сметы (копия с корректировкой) или как дополнительное соглашение на работы, не включённые в клиентскую смету.
+            </p>
             <div style={{ display: 'grid', gap: 10 }}>
-              <label style={LBL}>Название сметы
-                <input value={subModalForm.name} onChange={e => setSubModalForm(f => ({ ...f, name: e.target.value }))}
-                  style={{ ...INPUT, marginTop: 4 }} placeholder="Смета субподрядчика" />
-              </label>
-              <label style={LBL}>Скопировать из сметы (необязательно)
+              <label style={LBL}>Основание
                 <select value={subModalForm.sourceTaskId} onChange={e => setSubModalForm(f => ({ ...f, sourceTaskId: e.target.value }))}
                   style={{ ...INPUT, marginTop: 4 }}>
-                  <option value="">— Создать пустую —</option>
+                  <option value="">— Дополнительное соглашение (новые работы) —</option>
                   {tasks.filter(t => t.estimate_type !== 'subcontractor').map(t => (
-                    <option key={t.id} value={t.id}>{t.name || t.id.slice(0, 8)}</option>
+                    <option key={t.id} value={t.id}>
+                      На основании: {t.name || t.id.slice(0, 8)}
+                    </option>
                   ))}
                 </select>
               </label>
               {subModalForm.sourceTaskId && (
-                <label style={{ ...LBL, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <label style={{ ...LBL, flexDirection: 'row', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                   <input type="checkbox" checked={subModalForm.includeMatls}
                     onChange={e => setSubModalForm(f => ({ ...f, includeMatls: e.target.checked }))} />
-                  Включить материалы
+                  Включить материалы из сметы заказчика
                 </label>
               )}
+              <label style={LBL}>Название сметы
+                <input value={subModalForm.name} onChange={e => setSubModalForm(f => ({ ...f, name: e.target.value }))}
+                  style={{ ...INPUT, marginTop: 4 }}
+                  placeholder={subModalForm.sourceTaskId ? 'Смета субподрядчика (копия)' : 'Доп. соглашение №1'} />
+              </label>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <button disabled={savingSub} style={btnPrimary()} onClick={async () => {
                 setSavingSub(true);
                 try {
-                  let taskId: string;
+                  let newTaskId: string;
                   if (subModalForm.sourceTaskId) {
                     const r = await client.post(`/tasks/${subModalForm.sourceTaskId}/copy-as-subcontractor`, {
                       name: subModalForm.name || undefined,
                       include_materials: subModalForm.includeMatls,
                     });
-                    taskId = r.data.task_id;
+                    newTaskId = r.data.task_id;
                   } else {
                     const r = await client.post('/tasks/create-manual', {
-                      name: subModalForm.name || 'Смета субподрядчика',
+                      name: subModalForm.name || 'Доп. соглашение',
                       project_id: id,
                       estimate_type: 'subcontractor',
                     });
-                    taskId = r.data.task_id;
+                    newTaskId = r.data.task_id;
                   }
                   setShowSubModal(false);
-                  window.location.href = `/task/${taskId}/estimate`;
+                  window.location.href = `/task/${newTaskId}/estimate`;
                 } catch (e: any) {
                   alert(e?.response?.data?.detail || 'Ошибка создания сметы');
                 } finally { setSavingSub(false); }

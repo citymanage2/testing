@@ -673,7 +673,11 @@ export default function EstimateView() {
 
       {/* ── Content tabs ──────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 2, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 7, padding: 3, marginBottom: 14, width: 'fit-content' }}>
-        {([['estimate', '📋 Смета'], ['acceptance', '✅ Субподрядчики'], ['docs', '📄 Документы']] as const).map(([t, l]) => (
+        {([
+          ['estimate', '📋 Смета'],
+          ...(estimateType === 'subcontractor' ? [['acceptance', '✅ КС-2 с подрядчиком']] : []),
+          ['docs', '📄 Документы'],
+        ] as ['estimate' | 'acceptance' | 'docs', string][]).map(([t, l]) => (
           <button key={t} onClick={() => setActiveTab(t)}
             style={{ padding: '5px 16px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: activeTab === t ? 600 : 400, background: activeTab === t ? C.surface : 'transparent', color: activeTab === t ? C.primary : C.textSec, boxShadow: activeTab === t ? '0 1px 3px rgba(0,0,0,.1)' : 'none' }}>
             {l}
@@ -681,7 +685,14 @@ export default function EstimateView() {
         ))}
       </div>
 
-      {activeTab === 'acceptance' && id && data && (
+      {estimateType !== 'subcontractor' && activeTab === 'acceptance' && (
+        <div style={{ ...CARD, padding: 24, textAlign: 'center', color: C.textMuted, fontSize: 14 }}>
+          КС-2 с подрядчиком недоступен для клиентской сметы.<br />
+          Создайте субподрядную смету во вкладке «Сметы» карточки проекта.
+        </div>
+      )}
+
+      {activeTab === 'acceptance' && estimateType === 'subcontractor' && id && data && (
         <WorkAcceptancePanel taskId={id} items={data.items.map(i => ({ id: i.id, name: i.name, unit: i.unit, quantity: i.quantity, type: i.type, section: i.section, row_type: i.row_type }))} />
       )}
 
