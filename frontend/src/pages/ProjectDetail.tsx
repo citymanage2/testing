@@ -23,9 +23,9 @@ interface CardData {
 }
 interface GalleryMeta { id: number; file_name: string; mime_type: string; caption?: string; uploaded_at: string; }
 interface Payment { id: string; direction: string; amount: number; paid_at: string; description?: string; contractor_id?: string; contractor_name?: string; created_at: string; }
-interface FinSummary { budget_planned?: number; estimate_total: number; income_received: number; expenses_paid: number; balance: number; budget_remaining?: number; }
+interface FinSummary { budget_planned?: number; estimate_total: number; client_total: number; subcontractor_total: number; profit: number; income_received: number; expenses_paid: number; balance: number; budget_remaining?: number; }
 interface Contractor { id: string; kind: string; name: string; }
-interface TaskInProject { id: string; task_type: string; status: string; estimate_status?: string; name?: string; created_at: string; }
+interface TaskInProject { id: string; task_type: string; status: string; estimate_status?: string; estimate_type?: string; name?: string; created_at: string; }
 interface StageInfo { stage: string; stage_label: string; allowed_next_stages: string[]; }
 
 const STAGE_ORDER = ['LEAD','ESTIMATION','OPTIMIZATION','APPROVAL','EXECUTION','HANDOVER','WARRANTY','CLOSED'];
@@ -65,6 +65,11 @@ export default function ProjectDetail() {
   const [stageReason, setStageReason] = useState('');
   const [pendingStage, setPendingStage] = useState('');
   const [suggestions, setSuggestions] = useState<{stage: string; label: string; ready: boolean; condition_hint: string}[]>([]);
+  const [pmNameInput, setPmNameInput] = useState('');
+  const [savingPm, setSavingPm] = useState(false);
+  const [showSubModal, setShowSubModal] = useState(false);
+  const [subModalForm, setSubModalForm] = useState({ sourceTaskId: '', name: '', includeMatls: true });
+  const [savingSub, setSavingSub] = useState(false);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   async function loadAll() {
@@ -288,6 +293,28 @@ export default function ProjectDetail() {
                     {isAllowed && suggestion && !suggestion.ready && (
                       <div style={{ fontSize: 11, color: C.warning, marginTop: 2 }}>{suggestion.condition_hint}</div>
                     )}
+                    {isAllowed && !suggestion?.ready && stage === 'EXECUTION' && suggestion?.condition_hint?.includes('руководител') && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
+                        <input
+                          value={pmNameInput}
+                          onChange={e => setPmNameInput(e.target.value)}
+                          placeholder="Имя руководителя проекта"
+                          style={{ ...INPUT, fontSize: 12, padding: '4px 8px', width: 220 }}
+                        />
+                        <button
+                          disabled={savingPm || !pmNameInput.trim()}
+                          style={btnPrimary('sm')}
+                          onClick={async () => {
+                            setSavingPm(true);
+                            try {
+                              await client.patch(`/projects/${id}/details`, { project_manager_name: pmNameInput.trim() });
+                              setPmNameInput('');
+                              loadAll();
+                            } finally { setSavingPm(false); }
+                          }}
+                        >{savingPm ? '...' : 'Назначить'}</button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -364,7 +391,9 @@ export default function ProjectDetail() {
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
             {([
-              ['Смета (с НДС)', finSummary.estimate_total, C.primary],
+              ['Смета с заказчиком', finSummary.client_total, C.primary],
+              ['Смета с субподрядчиком', finSummary.subcontractor_total, C.warning],
+              ['Прибыль', finSummary.profit, finSummary.profit >= 0 ? C.success : C.danger],
               ['Плановый бюджет', finSummary.budget_planned ?? null, C.textSec],
               ['Получено доходов', finSummary.income_received, C.success],
               ['Оплачено расходов', finSummary.expenses_paid, C.danger],
@@ -422,12 +451,53 @@ export default function ProjectDetail() {
 
       {tab === 'estimates' && (
         <div>
-          {tasks.length === 0
-            ? <div style={{ ...CARD, padding: 40, textAlign: 'center', color: C.textMuted }}>Нет смет в проекте</div>
-            : tasks.map(t => (
+          {/* Client estimates */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <h4 style={{ margin: 0, fontSize: 14, color: C.text, fontWeight: 600 }}>Сметы с заказчиком</h4>
+            <button style={btnPrimary('sm')} onClick={async () => {
+              const n = prompt('Название новой сметы:');
+              if (!n?.trim()) return;
+              const r = await client.post('/tasks/create-manual', { name: n.trim(), project_id: id, estimate_type: 'main' });
+              window.location.href = `/task/${r.data.task_id}/estimate`;
+            }}>+ Новая смета</button>
+          </div>
+          {tasks.filter(t => t.estimate_type !== 'subcontractor').length === 0
+            ? <div style={{ ...CARD, padding: 20, textAlign: 'center', color: C.textMuted, marginBottom: 16 }}>Нет смет с заказчиком</div>
+            : tasks.filter(t => t.estimate_type !== 'subcontractor').map(t => (
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <Link to={`/task/${t.id}/estimate`} style={{ flex: 1, display: 'block', padding: '10px 14px', border: `1px solid ${C.border}`, borderRadius: 8, textDecoration: 'none', color: 'inherit', background: C.surfaceAlt }}>
-                  <div style={{ fontWeight: 500, color: C.text }}>{(t as any).name || `Смета ${t.id.slice(0, 8)}`}</div>
+                  <div style={{ fontWeight: 500, color: C.text }}>{t.name || `Смета ${t.id.slice(0, 8)}`}</div>
+                  <div style={{ fontSize: 12, color: C.textSec, marginTop: 2 }}>Статус: {t.estimate_status || 'не указан'} · {new Date(t.created_at).toLocaleDateString('ru-RU')}</div>
+                </Link>
+                <button
+                  onClick={async () => {
+                    if (!confirm('Удалить смету?')) return;
+                    try { await client.delete(`/tasks/${t.id}`); setTasks(prev => prev.filter(x => x.id !== t.id)); }
+                    catch { alert('Ошибка удаления'); }
+                  }}
+                  style={{ padding: '6px 10px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
+                  title="Удалить смету"
+                >✕</button>
+              </div>
+            ))}
+
+          {/* Subcontractor estimates */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 8 }}>
+            <h4 style={{ margin: 0, fontSize: 14, color: C.text, fontWeight: 600 }}>Сметы с субподрядчиком</h4>
+            <button style={btnOutline('sm')} onClick={() => {
+              setSubModalForm({ sourceTaskId: '', name: '', includeMatls: true });
+              setShowSubModal(true);
+            }}>+ Субподрядная</button>
+          </div>
+          {tasks.filter(t => t.estimate_type === 'subcontractor').length === 0
+            ? <div style={{ ...CARD, padding: 20, textAlign: 'center', color: C.textMuted }}>Нет смет с субподрядчиком</div>
+            : tasks.filter(t => t.estimate_type === 'subcontractor').map(t => (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <Link to={`/task/${t.id}/estimate`} style={{ flex: 1, display: 'block', padding: '10px 14px', border: `1px solid ${C.border}`, borderRadius: 8, textDecoration: 'none', color: 'inherit', background: C.surfaceAlt }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontWeight: 500, color: C.text }}>{t.name || `Смета ${t.id.slice(0, 8)}`}</span>
+                    <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: C.warningBg, color: C.warning, fontWeight: 600 }}>субподряд</span>
+                  </div>
                   <div style={{ fontSize: 12, color: C.textSec, marginTop: 2 }}>Статус: {t.estimate_status || 'не указан'} · {new Date(t.created_at).toLocaleDateString('ru-RU')}</div>
                 </Link>
                 <button
@@ -455,6 +525,64 @@ export default function ProjectDetail() {
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <button onClick={doStageTransition} style={btnPrimary()}>Подтвердить переход</button>
               <button onClick={() => setShowStageModal(false)} style={btnOutline()}>Отмена</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subcontractor estimate modal */}
+      {showSubModal && (
+        <div style={OVERLAY}>
+          <div style={{ ...MODAL, maxWidth: 440 }}>
+            <h3 style={{ margin: '0 0 14px', fontSize: 16 }}>Создать субподрядную смету</h3>
+            <div style={{ display: 'grid', gap: 10 }}>
+              <label style={LBL}>Название сметы
+                <input value={subModalForm.name} onChange={e => setSubModalForm(f => ({ ...f, name: e.target.value }))}
+                  style={{ ...INPUT, marginTop: 4 }} placeholder="Смета субподрядчика" />
+              </label>
+              <label style={LBL}>Скопировать из сметы (необязательно)
+                <select value={subModalForm.sourceTaskId} onChange={e => setSubModalForm(f => ({ ...f, sourceTaskId: e.target.value }))}
+                  style={{ ...INPUT, marginTop: 4 }}>
+                  <option value="">— Создать пустую —</option>
+                  {tasks.filter(t => t.estimate_type !== 'subcontractor').map(t => (
+                    <option key={t.id} value={t.id}>{t.name || t.id.slice(0, 8)}</option>
+                  ))}
+                </select>
+              </label>
+              {subModalForm.sourceTaskId && (
+                <label style={{ ...LBL, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" checked={subModalForm.includeMatls}
+                    onChange={e => setSubModalForm(f => ({ ...f, includeMatls: e.target.checked }))} />
+                  Включить материалы
+                </label>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button disabled={savingSub} style={btnPrimary()} onClick={async () => {
+                setSavingSub(true);
+                try {
+                  let taskId: string;
+                  if (subModalForm.sourceTaskId) {
+                    const r = await client.post(`/tasks/${subModalForm.sourceTaskId}/copy-as-subcontractor`, {
+                      name: subModalForm.name || undefined,
+                      include_materials: subModalForm.includeMatls,
+                    });
+                    taskId = r.data.task_id;
+                  } else {
+                    const r = await client.post('/tasks/create-manual', {
+                      name: subModalForm.name || 'Смета субподрядчика',
+                      project_id: id,
+                      estimate_type: 'subcontractor',
+                    });
+                    taskId = r.data.task_id;
+                  }
+                  setShowSubModal(false);
+                  window.location.href = `/task/${taskId}/estimate`;
+                } catch (e: any) {
+                  alert(e?.response?.data?.detail || 'Ошибка создания сметы');
+                } finally { setSavingSub(false); }
+              }}>{savingSub ? 'Создание...' : 'Создать'}</button>
+              <button style={btnOutline()} onClick={() => setShowSubModal(false)}>Отмена</button>
             </div>
           </div>
         </div>

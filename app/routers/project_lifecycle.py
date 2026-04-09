@@ -54,7 +54,7 @@ async def _check_transition_conditions(project, to_stage: str, db: AsyncSession)
         if not frozen:
             return "Для перехода необходима хотя бы одна замороженная смета"
     if to_stage == "EXECUTION":
-        if not getattr(project, "project_manager_id", None):
+        if not getattr(project, "project_manager_id", None) and not getattr(project, "project_manager_name", None):
             return "Назначьте руководителя проекта перед переходом в Реализацию"
         # Also require at least one signed estimate
         tasks_r = await db.execute(select(Task).where(Task.project_id == project.id))
@@ -100,6 +100,7 @@ class ProjectDetailsUpdate(BaseModel):
     construction_type: Optional[str] = None
     sales_manager_id: Optional[str] = None
     project_manager_id: Optional[str] = None
+    project_manager_name: Optional[str] = None
     contract_number: Optional[str] = None
     contract_date: Optional[date] = None
     name: Optional[str] = None

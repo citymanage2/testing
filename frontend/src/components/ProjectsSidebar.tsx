@@ -134,6 +134,7 @@ export default function ProjectsSidebar({ collapsed }: Props = {}) {
               <TaskRow key={t.id} task={t}
                 onNavigate={() => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`)}
                 onDelete={async () => { if (confirm('Удалить смету?')) { await client.delete(`/tasks/${t.id}`); setNoProjectTasks(prev => prev.filter(x => x.id !== t.id)); } }}
+                onRename={load}
                 draggable />
             ))}
         </SideSection>
@@ -185,6 +186,7 @@ export default function ProjectsSidebar({ collapsed }: Props = {}) {
                           <TaskRow key={t.id} task={t}
                             onNavigate={() => navigate(t.status === 'completed' ? `/task/${t.id}/estimate` : `/task/${t.id}/status`)}
                             onDelete={async () => { if (confirm('Удалить смету?')) { await client.delete(`/tasks/${t.id}`); refreshDetail(p.id); } }}
+                            onRename={() => refreshDetail(p.id)}
                           />
                         ))}
                     </>)}
@@ -218,8 +220,40 @@ function SideSection({ label, count, open, onToggle, accent, children }: {
   );
 }
 
-function TaskRow({ task: t, onNavigate, onDelete, draggable }: { task: TaskRef; onNavigate: () => void; onDelete?: () => void; draggable?: boolean; }) {
+function TaskRow({ task: t, onNavigate, onDelete, onRename, draggable }: { task: TaskRef; onNavigate: () => void; onDelete?: () => void; onRename?: () => void; draggable?: boolean; }) {
   const [hovered, setHovered] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameVal, setRenameVal] = useState('');
+
+  function startRename(e: React.MouseEvent) {
+    e.stopPropagation();
+    setRenameVal(t.name || TYPE_LABELS[t.task_type] || '');
+    setRenaming(true);
+  }
+
+  async function commitRename() {
+    setRenaming(false);
+    if (renameVal.trim()) {
+      try { await client.patch(`/tasks/${t.id}/name`, { name: renameVal.trim() }); onRename?.(); }
+      catch {}
+    }
+  }
+
+  if (renaming) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, marginBottom: 1, background: C.primaryBg }}>
+        <input
+          autoFocus
+          value={renameVal}
+          onChange={e => setRenameVal(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenaming(false); }}
+          style={{ flex: 1, fontSize: 12, padding: '2px 4px', border: `1px solid ${C.primary}`, borderRadius: 3, outline: 'none' }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5, cursor: 'pointer', marginBottom: 1, background: hovered ? C.surfaceAlt : 'transparent' }}
       draggable={draggable}
@@ -228,7 +262,12 @@ function TaskRow({ task: t, onNavigate, onDelete, draggable }: { task: TaskRef; 
       onMouseLeave={() => setHovered(false)}
     >
       {draggable && <span style={{ color: C.textMuted, fontSize: 10, cursor: 'grab' }}>⠿</span>}
-      <span onClick={onNavigate} style={{ flex: 1, fontSize: 12, color: C.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.name || TYPE_LABELS[t.task_type]}>
+      <span
+        onClick={onNavigate}
+        onDoubleClick={startRename}
+        style={{ flex: 1, fontSize: 12, color: C.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        title={(t.name || TYPE_LABELS[t.task_type]) + ' (двойной клик — переименовать)'}
+      >
         {t.name || TYPE_LABELS[t.task_type] || t.task_type}
         {t.doc_type && <span style={{ marginLeft: 4, fontSize: 10, color: C.textMuted }}>[{t.doc_type}]</span>}
       </span>

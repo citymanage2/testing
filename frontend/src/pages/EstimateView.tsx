@@ -69,6 +69,10 @@ export default function EstimateView() {
   const [savingExtras, setSavingExtras] = useState(false);
   const [showAddRow, setShowAddRow] = useState(false);
   const [newRow, setNewRow] = useState({ section: '', type: 'Работа', name: '', unit: 'шт', quantity: '1', work_price: '0', mat_price: '0' });
+  const [addRowMode, setAddRowMode] = useState<'manual' | 'catalog'>('manual');
+  const [catalogQuery, setCatalogQuery] = useState('');
+  const [catalogResults, setCatalogResults] = useState<{id: string; name: string; unit?: string; work_price: number; mat_price: number; item_type: string}[]>([]);
+  const [estimateType, setEstimateType] = useState<string | null>(null);
   const [showSepSheet, setShowSepSheet] = useState(false);
   const [sepSections, setSepSections] = useState<Record<string, boolean>>({});
   const [sepManual, setSepManual] = useState(false);
@@ -105,6 +109,7 @@ export default function EstimateView() {
       setTaskName(statusR.data.name || '');
       setDocType(statusR.data.doc_type || '');
       setEstimateStatus(statusR.data.estimate_status || '');
+      setEstimateType((statusR.data as any).estimate_type || null);
       setExtras(extrasR.data);
       // Load project stage for lock check
       if ((statusR.data as any).project_id) {
@@ -266,7 +271,30 @@ export default function EstimateView() {
     });
     setShowAddRow(false);
     setNewRow({ section: '', type: 'Работа', name: '', unit: 'шт', quantity: '1', work_price: '0', mat_price: '0' });
+    setCatalogQuery(''); setCatalogResults([]);
     load();
+  }
+
+  async function searchCatalog(q: string) {
+    setCatalogQuery(q);
+    if (!q.trim()) { setCatalogResults([]); return; }
+    try {
+      const r = await client.get('/catalog', { params: { q, limit: '30' } });
+      setCatalogResults(r.data);
+    } catch {}
+  }
+
+  function applyCatalogItem(item: typeof catalogResults[0]) {
+    setNewRow(r => ({
+      ...r,
+      name: item.name,
+      unit: item.unit || r.unit,
+      type: item.item_type === 'material' ? 'Материал' : 'Работа',
+      work_price: String(item.work_price),
+      mat_price: String(item.mat_price),
+    }));
+    setCatalogQuery(''); setCatalogResults([]);
+    setAddRowMode('manual');
   }
 
   async function saveExtras() {
@@ -558,24 +586,67 @@ export default function EstimateView() {
       {/* Add row modal */}
       {showAddRow && (
         <div style={OVERLAY}>
-          <div style={{ ...MODAL, maxWidth: 460 }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>Добавить строку</h3>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {([['Раздел', 'section'], ['Наименование', 'name'], ['Единица измерения', 'unit']] as [string, keyof typeof newRow][]).map(([label, key]) => (
-                <label key={key} style={LBL}>{label}<input value={newRow[key]} onChange={e => setNewRow({ ...newRow, [key]: e.target.value })} style={{ ...INPUT, marginTop: 4 }} /></label>
-              ))}
-              <label style={LBL}>Тип
-                <select value={newRow.type} onChange={e => setNewRow({ ...newRow, type: e.target.value })} style={{ ...INPUT, marginTop: 4 }}>
-                  <option>Работа</option><option>Материал</option>
-                </select>
-              </label>
-              {([['Количество', 'quantity'], ['Цена работ', 'work_price'], ['Цена материалов', 'mat_price']] as [string, keyof typeof newRow][]).map(([label, key]) => (
-                <label key={key} style={LBL}>{label}<input type="number" value={newRow[key]} onChange={e => setNewRow({ ...newRow, [key]: e.target.value })} style={{ ...INPUT, marginTop: 4 }} /></label>
+          <div style={{ ...MODAL, maxWidth: 480, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 16 }}>Добавить строку</h3>
+            {/* Mode toggle */}
+            <div style={{ display: 'flex', gap: 0, marginBottom: 12, borderRadius: 6, overflow: 'hidden', border: `1px solid ${C.border}` }}>
+              {(['manual', 'catalog'] as const).map(m => (
+                <button key={m} onClick={() => { setAddRowMode(m); setCatalogQuery(''); setCatalogResults([]); }}
+                  style={{ flex: 1, padding: '7px 0', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    background: addRowMode === m ? C.primary : C.surfaceAlt, color: addRowMode === m ? '#fff' : C.textSec }}>
+                  {m === 'manual' ? 'Вручную' : '📋 Из каталога'}
+                </button>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button onClick={addRow} style={btnPrimary()}>Добавить</button>
-              <button onClick={() => setShowAddRow(false)} style={btnOutline()}>Отмена</button>
+            <div style={{ overflow: 'auto', flex: 1 }}>
+              {addRowMode === 'catalog' && (
+                <div style={{ marginBottom: 10 }}>
+                  <input value={catalogQuery} onChange={e => searchCatalog(e.target.value)}
+                    placeholder="🔍 Поиск по каталогу расценок..."
+                    style={{ ...INPUT, marginBottom: 6 }} autoFocus />
+                  {catalogResults.length > 0 && (
+                    <div style={{ border: `1px solid ${C.border}`, borderRadius: 6, maxHeight: 260, overflow: 'auto' }}>
+                      {catalogResults.map(item => (
+                        <div key={item.id} onClick={() => applyCatalogItem(item)}
+                          style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = C.primaryBg)}
+                          onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                          <div>
+                            <div style={{ fontWeight: 500 }}>{item.name}</div>
+                            <div style={{ fontSize: 11, color: C.textSec, marginTop: 2 }}>
+                              {item.item_type === 'work' ? 'Работа' : 'Материал'}{item.unit ? ` · ${item.unit}` : ''}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 12, color: C.textSec, textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                            {item.work_price > 0 && <div>Р: {item.work_price.toLocaleString('ru-RU')}</div>}
+                            {item.mat_price > 0 && <div>М: {item.mat_price.toLocaleString('ru-RU')}</div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {catalogQuery && catalogResults.length === 0 && (
+                    <div style={{ padding: 12, color: C.textMuted, fontSize: 13, textAlign: 'center' }}>Ничего не найдено</div>
+                  )}
+                </div>
+              )}
+              <div style={{ display: 'grid', gap: 8 }}>
+                {([['Раздел', 'section'], ['Наименование', 'name'], ['Единица измерения', 'unit']] as [string, keyof typeof newRow][]).map(([label, key]) => (
+                  <label key={key} style={LBL}>{label}<input value={newRow[key]} onChange={e => setNewRow({ ...newRow, [key]: e.target.value })} style={{ ...INPUT, marginTop: 4 }} /></label>
+                ))}
+                <label style={LBL}>Тип
+                  <select value={newRow.type} onChange={e => setNewRow({ ...newRow, type: e.target.value })} style={{ ...INPUT, marginTop: 4 }}>
+                    <option>Работа</option><option>Материал</option>
+                  </select>
+                </label>
+                {([['Количество', 'quantity'], ['Цена работ', 'work_price'], ['Цена материалов', 'mat_price']] as [string, keyof typeof newRow][]).map(([label, key]) => (
+                  <label key={key} style={LBL}>{label}<input type="number" value={newRow[key]} onChange={e => setNewRow({ ...newRow, [key]: e.target.value })} style={{ ...INPUT, marginTop: 4 }} /></label>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+              <button onClick={addRow} style={btnPrimary()} disabled={!newRow.name.trim()}>Добавить</button>
+              <button onClick={() => { setShowAddRow(false); setCatalogQuery(''); setCatalogResults([]); }} style={btnOutline()}>Отмена</button>
             </div>
           </div>
         </div>
@@ -588,6 +659,15 @@ export default function EstimateView() {
         }}>
           🔒 <strong>Смета защищена от изменений</strong>
           {estimateStatus === 'signed' ? ' — смета подписана' : ' — проект в стадии реализации'}
+        </div>
+      )}
+
+      {estimateType === 'subcontractor' && (
+        <div style={{
+          background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8,
+          padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+        }}>
+          🏗 <strong>Смета субподрядчика</strong> — используется для расчёта прибыли по проекту (разница с клиентской сметой)
         </div>
       )}
 

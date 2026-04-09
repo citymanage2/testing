@@ -28,6 +28,8 @@ class TaskInProject(BaseModel):
     task_type: str
     status: str
     estimate_status: Optional[str]
+    estimate_type: Optional[str] = None
+    name: Optional[str] = None
     created_at: datetime
 
 

@@ -269,10 +269,24 @@ async def delete_payment(project_id: str, payment_id: str, current_user: User = 
 class FinancialSummary(BaseModel):
     budget_planned: Optional[float]
     estimate_total: float
+    client_total: float
+    subcontractor_total: float
+    profit: float
     income_received: float
     expenses_paid: float
     balance: float
     budget_remaining: Optional[float]
+
+
+def _calc_task_total(task, items) -> float:
+    extras = task.extras or {}
+    base = sum((i.work_price + i.mat_price) * i.quantity for i in items if getattr(i, "row_type", "item") != "section_header")
+    overhead = extras.get("overhead_sum", 0) + base * extras.get("overhead_pct", 0) / 100
+    transport = extras.get("transport_sum", 0) + base * extras.get("transport_pct", 0) / 100
+    contingency = extras.get("contingency_sum", 0) + base * extras.get("contingency_pct", 0) / 100
+    vat_rate = extras.get("vat_rate", 20.0)
+    grand_base = base + overhead + transport + contingency
+    return round(grand_base * (1 + vat_rate / 100), 2)
 
 
 @router.get("/{project_id}/financial-summary", response_model=FinancialSummary)
@@ -285,28 +299,29 @@ async def financial_summary(
     if not project or project.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Not found")
 
-    # Estimate total from all tasks in this project
     tasks = (await db.execute(select(Task).where(Task.project_id == project_id))).scalars().all()
-    estimate_total = 0.0
+    client_total = 0.0
+    subcontractor_total = 0.0
     for task in tasks:
         items = (await db.execute(select(EstimateItem).where(EstimateItem.task_id == task.id))).scalars().all()
-        extras = task.extras or {}
-        base = sum((i.work_price + i.mat_price) * i.quantity for i in items if getattr(i, "row_type", "item") != "section_header")
-        overhead = extras.get("overhead_sum", 0) + base * extras.get("overhead_pct", 0) / 100
-        transport = extras.get("transport_sum", 0) + base * extras.get("transport_pct", 0) / 100
-        contingency = extras.get("contingency_sum", 0) + base * extras.get("contingency_pct", 0) / 100
-        vat_rate = extras.get("vat_rate", 20.0)
-        grand_base = base + overhead + transport + contingency
-        estimate_total += round(grand_base * (1 + vat_rate / 100), 2)
+        t = _calc_task_total(task, items)
+        if getattr(task, "estimate_type", None) == "subcontractor":
+            subcontractor_total += t
+        else:
+            client_total += t
 
     payments = (await db.execute(select(ProjectPayment).where(ProjectPayment.project_id == project_id))).scalars().all()
     income = sum(float(p.amount) for p in payments if p.direction == "income")
     expenses = sum(float(p.amount) for p in payments if p.direction == "expense")
     budget = float(project.budget_planned) if project.budget_planned else None
+    estimate_total = client_total
 
     return FinancialSummary(
         budget_planned=budget,
         estimate_total=round(estimate_total, 2),
+        client_total=round(client_total, 2),
+        subcontractor_total=round(subcontractor_total, 2),
+        profit=round(client_total - subcontractor_total, 2),
         income_received=round(income, 2),
         expenses_paid=round(expenses, 2),
         balance=round(income - expenses, 2),

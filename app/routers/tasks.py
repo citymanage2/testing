@@ -24,7 +24,8 @@ async def list_tasks(current_user: CurrentUser, db: AsyncSession = Depends(get_d
     return [TaskStatusResponse(
         id=t.id, task_type=t.task_type, status=t.status, name=t.name, doc_type=t.doc_type,
         progress_message=t.progress_message, error_message=t.error_message,
-        estimate_status=t.estimate_status, created_at=t.created_at, updated_at=t.updated_at,
+        estimate_status=t.estimate_status, estimate_type=getattr(t, 'estimate_type', None),
+        created_at=t.created_at, updated_at=t.updated_at,
     ) for t in tasks]
 
 
@@ -73,6 +74,32 @@ async def create_task(
     return {"task_id": task.id}
 
 
+@router.post("/create-manual", status_code=201)
+async def create_manual_task(
+    body: dict,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create an empty estimate task for manual editing."""
+    import uuid
+    from datetime import datetime, timezone
+    task = Task(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        task_type="IMPORT_EXCEL",
+        status="completed",
+        name=body.get("name") or "Новая смета",
+        project_id=body.get("project_id"),
+        estimate_status="draft",
+        estimate_type=body.get("estimate_type") or "main",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db.add(task)
+    await db.commit()
+    return {"task_id": task.id}
+
+
 @router.get("/{task_id}/status", response_model=TaskStatusResponse)
 async def get_status(
     task_id: str,
@@ -91,6 +118,7 @@ async def get_status(
         progress_message=task.progress_message,
         error_message=task.error_message,
         estimate_status=task.estimate_status,
+        estimate_type=getattr(task, 'estimate_type', None),
         created_at=task.created_at,
         updated_at=task.updated_at,
     )
@@ -174,6 +202,78 @@ async def update_task_doc_type(
     task.doc_type = body.doc_type
     await db.commit()
     return {"ok": True}
+
+
+@router.post("/{task_id}/copy-as-subcontractor", status_code=201)
+async def copy_task_as_subcontractor(
+    task_id: str,
+    body: dict,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Copy a task's estimate as a subcontractor estimate."""
+    import uuid
+    from datetime import datetime, timezone
+    from app.models.estimate_item import EstimateItem
+
+    source_task = await db.get(Task, task_id)
+    if not source_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if source_task.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    include_materials = body.get("include_materials", True)
+    new_name = body.get("name") or f"{source_task.name or 'Смета'} (субподряд)"
+
+    new_task = Task(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        task_type=source_task.task_type,
+        status="completed",
+        name=new_name,
+        project_id=source_task.project_id,
+        estimate_status="draft",
+        estimate_type="subcontractor",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db.add(new_task)
+    await db.flush()
+
+    items_result = await db.execute(
+        select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.sort_order)
+    )
+    source_items = items_result.scalars().all()
+
+    for item in source_items:
+        if not include_materials and item.type == "Материал":
+            continue
+        new_item = EstimateItem(
+            id=str(uuid.uuid4()),
+            task_id=new_task.id,
+            position=item.position,
+            section=item.section,
+            type=item.type,
+            name=item.name,
+            unit=item.unit,
+            quantity=item.quantity,
+            work_price=item.work_price,
+            mat_price=item.mat_price,
+            total=item.total,
+            is_analogue=item.is_analogue,
+            is_optimized=item.is_optimized,
+            source_url=item.source_url,
+            comment=item.comment,
+            original_data=item.original_data,
+            row_type=item.row_type,
+            sort_order=item.sort_order,
+            sale_price=item.sale_price,
+            position_code=item.position_code,
+        )
+        db.add(new_item)
+
+    await db.commit()
+    return {"task_id": new_task.id}
 
 
 @router.get("/{task_id}/results", response_model=list[TaskResultFile])

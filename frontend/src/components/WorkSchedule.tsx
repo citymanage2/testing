@@ -237,6 +237,12 @@ export default function WorkSchedule({ projectId }: { projectId: string }) {
         </label>
         <button style={btnOutline('sm')} onClick={loadFromEstimates}>Из сметы</button>
         <button style={btnPrimary('sm')} onClick={openNew}>+ Добавить строку</button>
+        <button style={btnGhost('sm')} onClick={async () => {
+          const resp = await client.get(`/projects/${projectId}/schedule/export-excel`, { responseType: 'blob' });
+          const url = URL.createObjectURL(resp.data);
+          const a = document.createElement('a'); a.href = url; a.download = 'gpr.xlsx'; a.click();
+          URL.revokeObjectURL(url);
+        }}>⬇ Excel</button>
       </div>
 
       {/* Schedule table */}

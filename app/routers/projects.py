@@ -63,7 +63,7 @@ async def get_project(project_id: str, current_user: CurrentUser, db: AsyncSessi
     tasks = tasks_result.scalars().all()
     return ProjectDetailResponse(
         id=project.id, name=project.name, description=project.description,
-        tasks=[TaskInProject(id=t.id, task_type=t.task_type, status=t.status, estimate_status=t.estimate_status, created_at=t.created_at) for t in tasks],
+        tasks=[TaskInProject(id=t.id, task_type=t.task_type, status=t.status, estimate_status=t.estimate_status, estimate_type=getattr(t, 'estimate_type', None), name=t.name, created_at=t.created_at) for t in tasks],
     )
 
 

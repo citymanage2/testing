@@ -106,6 +106,51 @@ async def save_estimate_item_to_catalog(
     return _out(row)
 
 
+@router.get("/duplicates/count")
+async def count_catalog_duplicates(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    all_entries = (await db.execute(
+        select(PriceCatalog).where(PriceCatalog.user_id == current_user.id)
+        .order_by(PriceCatalog.name, PriceCatalog.updated_at.desc())
+    )).scalars().all()
+    seen: set = set()
+    count = 0
+    for entry in all_entries:
+        key = (entry.item_type, entry.name.strip().lower(), round(entry.work_price, 2), round(entry.mat_price, 2))
+        if key in seen:
+            count += 1
+        else:
+            seen.add(key)
+    return {"duplicate_count": count}
+
+
+@router.delete("/duplicates")
+async def delete_catalog_duplicates(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete duplicate catalog entries keeping the newest per (item_type, name, work_price, mat_price)."""
+    all_entries = (await db.execute(
+        select(PriceCatalog)
+        .where(PriceCatalog.user_id == current_user.id)
+        .order_by(PriceCatalog.name, PriceCatalog.updated_at.desc())
+    )).scalars().all()
+    seen: set = set()
+    to_delete = []
+    for entry in all_entries:
+        key = (entry.item_type, entry.name.strip().lower(), round(entry.work_price, 2), round(entry.mat_price, 2))
+        if key in seen:
+            to_delete.append(entry)
+        else:
+            seen.add(key)
+    for entry in to_delete:
+        await db.delete(entry)
+    await db.commit()
+    return {"deleted": len(to_delete)}
+
+
 @router.put("/{entry_id}", response_model=CatalogEntryOut)
 async def update_catalog_entry(
     entry_id: str,
