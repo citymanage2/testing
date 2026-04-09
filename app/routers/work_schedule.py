@@ -226,6 +226,91 @@ async def delete_schedule_item(
     await db.commit()
 
 
+@router.post("/{project_id}/schedule/items/from-estimates")
+async def create_items_from_estimates(
+    project_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Auto-populate GPR from all signed client estimates in the project.
+    Skips items already imported (matched by estimate_item_id) and section headers."""
+    await _get_project_owned(project_id, current_user.id, db)
+
+    # Find all signed, non-subcontractor tasks for this project
+    tasks_result = await db.execute(
+        select(Task).where(
+            and_(
+                Task.project_id == project_id,
+                Task.estimate_status == "signed",
+            )
+        )
+    )
+    tasks = [t for t in tasks_result.scalars().all() if getattr(t, "estimate_type", None) != "subcontractor"]
+
+    if not tasks:
+        # Fall back to all completed tasks (draft) if none signed
+        tasks_result2 = await db.execute(
+            select(Task).where(Task.project_id == project_id)
+        )
+        tasks = [t for t in tasks_result2.scalars().all() if getattr(t, "estimate_type", None) != "subcontractor"]
+
+    task_ids = [t.id for t in tasks]
+    if not task_ids:
+        return {"created": 0}
+
+    # Get already-imported estimate_item_ids to avoid duplicates
+    existing_result = await db.execute(
+        select(WorkScheduleItem.estimate_item_id).where(
+            and_(
+                WorkScheduleItem.project_id == project_id,
+                WorkScheduleItem.estimate_item_id.isnot(None),
+            )
+        )
+    )
+    already_imported = {row[0] for row in existing_result.all()}
+
+    # Get max sort_order
+    max_result = await db.execute(
+        select(func.max(WorkScheduleItem.sort_order)).where(
+            WorkScheduleItem.project_id == project_id
+        )
+    )
+    next_sort = (max_result.scalar() or 0.0) + 1.0
+
+    # Load all non-header work items from those tasks
+    estimate_items_result = await db.execute(
+        select(EstimateItem).where(
+            and_(
+                EstimateItem.task_id.in_(task_ids),
+                EstimateItem.type == "Работа",
+            )
+        ).order_by(EstimateItem.sort_order)
+    )
+    estimate_items = [
+        i for i in estimate_items_result.scalars().all()
+        if getattr(i, "row_type", "item") != "section_header"
+        and i.id not in already_imported
+    ]
+
+    count = 0
+    for est_item in estimate_items:
+        new_item = WorkScheduleItem(
+            id=str(uuid.uuid4()),
+            project_id=project_id,
+            estimate_item_id=est_item.id,
+            name=est_item.name,
+            unit=est_item.unit or "",
+            total_quantity=float(est_item.quantity or 0),
+            sort_order=next_sort,
+        )
+        db.add(new_item)
+        next_sort += 1.0
+        count += 1
+
+    await db.commit()
+    return {"created": count}
+
+
 @router.post("/{project_id}/schedule/items/from-estimate")
 async def create_items_from_estimate(
     project_id: str,
