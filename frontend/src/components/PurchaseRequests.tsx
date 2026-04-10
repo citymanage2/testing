@@ -39,16 +39,6 @@ interface EstimateMaterial {
   quantity_delivered: number;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Черновик',
-  submitted: 'Черновик',       // legacy
-  approved: 'Черновик',        // legacy
-  ordered: 'Черновик',         // legacy
-  delivered: 'Подтверждено',   // legacy map
-  confirmed: 'Подтверждено',
-  cancelled: 'Отменено',
-};
-
 function statusBadge(s: string) {
   if (s === 'confirmed' || s === 'delivered') return <span style={badge(C.success, C.successBg)}>Подтверждено</span>;
   if (s === 'cancelled') return <span style={badge(C.danger, C.dangerBg)}>Отменено</span>;
@@ -113,12 +103,6 @@ export default function PurchaseRequests({ projectId }: { projectId: string }) {
   const confirmPurchase = async (p: Purchase) => {
     if (!confirm(`Подтвердить заявку "${p.title}"? Позиции будут учтены в расходе.`)) return;
     await client.patch(`/projects/${projectId}/purchases/${p.id}`, { status: 'confirmed' });
-    load();
-  };
-
-  const cancelPurchase = async (p: Purchase) => {
-    if (!confirm('Отменить заявку?')) return;
-    await client.patch(`/projects/${projectId}/purchases/${p.id}`, { status: 'cancelled' });
     load();
   };
 

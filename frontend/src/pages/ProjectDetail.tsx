@@ -7,7 +7,6 @@ import WorkSchedule from '../components/WorkSchedule';
 import ClientActsManager from '../components/ClientActsManager';
 import PurchaseRequests from '../components/PurchaseRequests';
 import WarrantyClaims from '../components/WarrantyClaims';
-import KpRequests from '../components/KpRequests';
 import { C, btnPrimary, btnOutline, btnDanger, btnGhost, badge, INPUT, LBL, CARD, TH, TD, OVERLAY, MODAL } from '../ui';
 
 interface CardData {
