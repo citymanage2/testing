@@ -6,7 +6,6 @@ import VersionHistoryDrawer from '../components/VersionHistoryDrawer';
 import OptimizationChecklist from '../components/OptimizationChecklist';
 import AnaloguePanel from '../components/AnaloguePanel';
 import DocumentGenerator from '../components/DocumentGenerator';
-import WorkAcceptancePanel from '../components/WorkAcceptancePanel';
 import AiAssistModal from '../components/AiAssistModal';
 import { C, btnPrimary, btnOutline, btnDanger, btnGhost, INPUT, LBL, CARD, TH, TD, OVERLAY, MODAL } from '../ui';
 import BatchAnalogueModal from '../components/BatchAnalogueModal';
@@ -91,7 +90,9 @@ export default function EstimateView() {
   const [batchCoeff, setBatchCoeff] = useState('1');
   const [showBatchAnalogue, setShowBatchAnalogue] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'estimate' | 'acceptance' | 'docs'>('estimate');
+  const [activeTab, setActiveTab] = useState<'estimate' | 'docs'>('estimate');
+  const [subCoeff, setSubCoeff] = useState('1');
+  const [applyingCoeff, setApplyingCoeff] = useState(false);
   const [showAiAssist, setShowAiAssist] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -164,7 +165,10 @@ export default function EstimateView() {
       await client.patch(`/projects/estimates/${id}/items/${item.id}`, patch);
       setEditCell(null);
       load();
-    } catch { setEditCell(null); }
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      alert('Ошибка сохранения: ' + (msg || 'попробуйте ещё раз'));
+    }
   }
 
   function editInput(item: Item, field: string) {
@@ -350,6 +354,24 @@ export default function EstimateView() {
     }
     alert(`${ids.length} позиций добавлено в прайс`);
     setSelectedIds(new Set());
+  }
+
+  async function applySubCoeff(scope: 'all' | 'works' | 'materials') {
+    if (!data) return;
+    const c = parseFloat(subCoeff);
+    if (isNaN(c) || c <= 0) { alert('Введите корректный коэффициент (больше 0)'); return; }
+    if (!confirm(`Применить коэффициент ${c} к ${scope === 'all' ? 'всей смете' : scope === 'works' ? 'работам' : 'материалам'}?`)) return;
+    setApplyingCoeff(true);
+    try {
+      const ids = data.items
+        .filter(i => i.row_type !== 'section_header' &&
+          (scope === 'all' ||
+           (scope === 'works' && i.type === 'Работа') ||
+           (scope === 'materials' && i.type === 'Материал')))
+        .map(i => i.id);
+      await client.post(`/projects/estimates/${id}/items/batch-update`, { item_ids: ids, coefficient: c });
+      load();
+    } finally { setApplyingCoeff(false); }
   }
 
   function handleDragStart(e: React.DragEvent, itemId: string) {
@@ -663,38 +685,51 @@ export default function EstimateView() {
       )}
 
       {estimateType === 'subcontractor' && (
-        <div style={{
-          background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8,
-          padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
-        }}>
-          🏗 <strong>Смета субподрядчика</strong> — используется для расчёта прибыли по проекту (разница с клиентской сметой)
-        </div>
+        <>
+          <div style={{
+            background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8,
+            padding: '10px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+          }}>
+            🏗 <strong>Смета субподрядчика</strong> — используется для расчёта прибыли по проекту (разница с клиентской сметой)
+          </div>
+          <div style={{
+            background: '#f0f9ff', border: '1px solid #0ea5e9', borderRadius: 8,
+            padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12, fontSize: 13, flexWrap: 'wrap',
+          }}>
+            <strong style={{ color: '#0369a1' }}>Понижающий коэффициент:</strong>
+            <input
+              type="number" min="0.01" step="0.01" value={subCoeff}
+              onChange={e => setSubCoeff(e.target.value)}
+              style={{ width: 80, padding: '3px 8px', border: '1px solid #0ea5e9', borderRadius: 5, fontSize: 13 }}
+            />
+            <button onClick={() => applySubCoeff('all')} disabled={applyingCoeff || isLocked}
+              style={{ ...btnOutline('sm'), opacity: (applyingCoeff || isLocked) ? 0.5 : 1 }}>
+              × Вся смета
+            </button>
+            <button onClick={() => applySubCoeff('works')} disabled={applyingCoeff || isLocked}
+              style={{ ...btnOutline('sm'), opacity: (applyingCoeff || isLocked) ? 0.5 : 1 }}>
+              × Работы
+            </button>
+            <button onClick={() => applySubCoeff('materials')} disabled={applyingCoeff || isLocked}
+              style={{ ...btnOutline('sm'), opacity: (applyingCoeff || isLocked) ? 0.5 : 1 }}>
+              × Материалы
+            </button>
+          </div>
+        </>
       )}
 
       {/* ── Content tabs ──────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 2, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 7, padding: 3, marginBottom: 14, width: 'fit-content' }}>
         {([
           ['estimate', '📋 Смета'],
-          ...(estimateType === 'subcontractor' ? [['acceptance', '✅ КС-2 с подрядчиком']] : []),
           ['docs', '📄 Документы'],
-        ] as ['estimate' | 'acceptance' | 'docs', string][]).map(([t, l]) => (
+        ] as ['estimate' | 'docs', string][]).map(([t, l]) => (
           <button key={t} onClick={() => setActiveTab(t)}
             style={{ padding: '5px 16px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: activeTab === t ? 600 : 400, background: activeTab === t ? C.surface : 'transparent', color: activeTab === t ? C.primary : C.textSec, boxShadow: activeTab === t ? '0 1px 3px rgba(0,0,0,.1)' : 'none' }}>
             {l}
           </button>
         ))}
       </div>
-
-      {estimateType !== 'subcontractor' && activeTab === 'acceptance' && (
-        <div style={{ ...CARD, padding: 24, textAlign: 'center', color: C.textMuted, fontSize: 14 }}>
-          КС-2 с подрядчиком недоступен для клиентской сметы.<br />
-          Создайте субподрядную смету во вкладке «Сметы» карточки проекта.
-        </div>
-      )}
-
-      {activeTab === 'acceptance' && estimateType === 'subcontractor' && id && data && (
-        <WorkAcceptancePanel taskId={id} items={data.items.map(i => ({ id: i.id, name: i.name, unit: i.unit, quantity: i.quantity, type: i.type, section: i.section, row_type: i.row_type }))} />
-      )}
 
       {activeTab === 'docs' && id && (
         <DocumentGenerator taskId={id} />

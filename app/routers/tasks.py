@@ -223,6 +223,7 @@ async def copy_task_as_subcontractor(
         raise HTTPException(status_code=403, detail="Forbidden")
 
     include_materials = body.get("include_materials", True)
+    item_ids_filter = body.get("item_ids")  # None = copy all; list = copy only these IDs
     new_name = body.get("name") or f"{source_task.name or 'Смета'} (субподряд)"
 
     new_task = Task(
@@ -245,8 +246,11 @@ async def copy_task_as_subcontractor(
     )
     source_items = items_result.scalars().all()
 
+    item_ids_set = set(item_ids_filter) if item_ids_filter else None
     for item in source_items:
         if not include_materials and item.type == "Материал":
+            continue
+        if item_ids_set is not None and item.id not in item_ids_set:
             continue
         new_item = EstimateItem(
             id=str(uuid.uuid4()),

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import client from '../api/client';
 import ProjectDocuments from '../components/ProjectDocuments';
@@ -68,8 +68,11 @@ export default function ProjectDetail() {
   const [pmNameInput, setPmNameInput] = useState('');
   const [savingPm, setSavingPm] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
-  const [subModalForm, setSubModalForm] = useState({ sourceTaskId: '', name: '', includeMatls: true });
+  const [subModalForm, setSubModalForm] = useState({ sourceTaskId: '', name: '' });
   const [savingSub, setSavingSub] = useState(false);
+  const [subSourceItems, setSubSourceItems] = useState<{id: string; name: string; type: string; section: string; unit: string; quantity: number}[]>([]);
+  const [subSelectedIds, setSubSelectedIds] = useState<Set<string>>(new Set());
+  const [loadingSubItems, setLoadingSubItems] = useState(false);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   async function loadAll() {
@@ -98,6 +101,18 @@ export default function ProjectDetail() {
   }
 
   useEffect(() => { loadAll(); }, [id]);
+
+  useEffect(() => {
+    if (!subModalForm.sourceTaskId) { setSubSourceItems([]); setSubSelectedIds(new Set()); return; }
+    setLoadingSubItems(true);
+    client.get<{ items: {id: string; name: string; type: string; section: string; unit: string; quantity: number; row_type?: string}[] }>(
+      `/projects/estimates/${subModalForm.sourceTaskId}/items`
+    ).then(r => {
+      const items = r.data.items.filter(i => i.row_type !== 'section_header');
+      setSubSourceItems(items);
+      setSubSelectedIds(new Set(items.map(i => i.id)));
+    }).catch(() => {}).finally(() => setLoadingSubItems(false));
+  }, [subModalForm.sourceTaskId]);
 
   async function saveCard() {
     setSaving(true);
@@ -157,7 +172,7 @@ export default function ProjectDetail() {
     ...(atLeast('ESTIMATION') ? [['schedule', '📅 ГПР'] as [TabType, string]] : []),
     ...(atLeast('APPROVAL')   ? [['contracts', '📄 Договоры'] as [TabType, string]] : []),
     ...(atLeast('EXECUTION')  ? [
-      ['acts',      '✅ КС-2 с заказчиком'],
+      ['acts',      '✅ КС-2'],
       ['purchases', '🛒 Закупки'],
       ['gallery',   `🖼 Фото (${card.gallery_count})`],
     ] as [TabType, string][] : []),
@@ -533,12 +548,12 @@ export default function ProjectDetail() {
       {/* Subcontractor estimate modal */}
       {showSubModal && (
         <div style={OVERLAY}>
-          <div style={{ ...MODAL, maxWidth: 480 }}>
+          <div style={{ ...MODAL, maxWidth: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ margin: '0 0 6px', fontSize: 16 }}>Создать смету с подрядчиком</h3>
-            <p style={{ margin: '0 0 14px', fontSize: 13, color: C.textMuted }}>
-              Смета с подрядчиком создаётся на основании клиентской сметы (копия с корректировкой) или как дополнительное соглашение на работы, не включённые в клиентскую смету.
+            <p style={{ margin: '0 0 12px', fontSize: 13, color: C.textMuted }}>
+              На основании сметы заказчика (выберите позиции) или как дополнительное соглашение на новые работы.
             </p>
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gap: 10, overflow: 'auto', flex: 1 }}>
               <label style={LBL}>Основание
                 <select value={subModalForm.sourceTaskId} onChange={e => setSubModalForm(f => ({ ...f, sourceTaskId: e.target.value }))}
                   style={{ ...INPUT, marginTop: 4 }}>
@@ -550,28 +565,83 @@ export default function ProjectDetail() {
                   ))}
                 </select>
               </label>
+
               {subModalForm.sourceTaskId && (
-                <label style={{ ...LBL, flexDirection: 'row', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={subModalForm.includeMatls}
-                    onChange={e => setSubModalForm(f => ({ ...f, includeMatls: e.target.checked }))} />
-                  Включить материалы из сметы заказчика
-                </label>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Позиции для копирования:</span>
+                    {loadingSubItems ? (
+                      <span style={{ fontSize: 12, color: C.textMuted }}>Загрузка...</span>
+                    ) : (
+                      <>
+                        <button style={{ ...btnGhost('sm'), fontSize: 12 }}
+                          onClick={() => setSubSelectedIds(new Set(subSourceItems.map(i => i.id)))}>
+                          Выбрать все
+                        </button>
+                        <button style={{ ...btnGhost('sm'), fontSize: 12 }}
+                          onClick={() => setSubSelectedIds(new Set())}>
+                          Снять все
+                        </button>
+                        <span style={{ fontSize: 12, color: C.textMuted }}>{subSelectedIds.size} / {subSourceItems.length}</span>
+                      </>
+                    )}
+                  </div>
+                  {!loadingSubItems && subSourceItems.length > 0 && (
+                    <div style={{ border: `1px solid ${C.border}`, borderRadius: 6, maxHeight: 280, overflowY: 'auto' }}>
+                      {(() => {
+                        const rows: React.ReactNode[] = [];
+                        let lastSection = '';
+                        subSourceItems.forEach(item => {
+                          const sec = item.section || '— без раздела —';
+                          if (sec !== lastSection) {
+                            lastSection = sec;
+                            rows.push(
+                              <div key={`sec-${sec}`} style={{ padding: '5px 10px', background: C.surfaceAlt, fontSize: 11, fontWeight: 700, color: C.textSec, borderBottom: `1px solid ${C.border}` }}>
+                                {sec}
+                              </div>
+                            );
+                          }
+                          rows.push(
+                            <label key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 10px', cursor: 'pointer', fontSize: 13, borderBottom: `1px solid ${C.border}` }}>
+                              <input type="checkbox" checked={subSelectedIds.has(item.id)}
+                                onChange={e => {
+                                  const next = new Set(subSelectedIds);
+                                  if (e.target.checked) next.add(item.id); else next.delete(item.id);
+                                  setSubSelectedIds(next);
+                                }} style={{ marginTop: 2 }} />
+                              <div>
+                                <span style={{ fontWeight: 500, color: C.text }}>{item.name}</span>
+                                <span style={{ marginLeft: 6, fontSize: 11, color: item.type === 'Работа' ? '#1d4ed8' : '#065f46', background: item.type === 'Работа' ? '#dbeafe' : '#d1fae5', padding: '1px 5px', borderRadius: 4 }}>
+                                  {item.type === 'Работа' ? 'Р' : 'М'}
+                                </span>
+                                <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 6 }}>{item.quantity} {item.unit}</span>
+                              </div>
+                            </label>
+                          );
+                        });
+                        return rows;
+                      })()}
+                    </div>
+                  )}
+                </div>
               )}
+
               <label style={LBL}>Название сметы
                 <input value={subModalForm.name} onChange={e => setSubModalForm(f => ({ ...f, name: e.target.value }))}
                   style={{ ...INPUT, marginTop: 4 }}
                   placeholder={subModalForm.sourceTaskId ? 'Смета субподрядчика (копия)' : 'Доп. соглашение №1'} />
               </label>
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
               <button disabled={savingSub} style={btnPrimary()} onClick={async () => {
                 setSavingSub(true);
                 try {
                   let newTaskId: string;
                   if (subModalForm.sourceTaskId) {
+                    const allSelected = subSelectedIds.size === subSourceItems.length;
                     const r = await client.post(`/tasks/${subModalForm.sourceTaskId}/copy-as-subcontractor`, {
                       name: subModalForm.name || undefined,
-                      include_materials: subModalForm.includeMatls,
+                      item_ids: allSelected ? undefined : Array.from(subSelectedIds),
                     });
                     newTaskId = r.data.task_id;
                   } else {

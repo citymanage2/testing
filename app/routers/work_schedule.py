@@ -311,7 +311,7 @@ async def create_items_from_estimates(
     return {"created": count}
 
 
-@router.post("/{project_id}/schedule/items/from-estimate")
+@router.post("/{project_id}/schedule/items/from-specific-estimates")
 async def create_items_from_estimate(
     project_id: str,
     body: FromEstimateRequest,
@@ -374,10 +374,19 @@ async def replace_entries(
     if not item or item.project_id != project_id:
         raise HTTPException(status_code=404, detail="Schedule item not found")
 
-    # Delete existing entries
-    existing_result = await db.execute(
-        select(WorkScheduleEntry).where(WorkScheduleEntry.schedule_item_id == item_id)
-    )
+    # Delete only entries of the same period_type (preserve the other type for sync)
+    incoming_type = body[0].period_type if body else None
+    if incoming_type:
+        existing_result = await db.execute(
+            select(WorkScheduleEntry).where(
+                WorkScheduleEntry.schedule_item_id == item_id,
+                WorkScheduleEntry.period_type == incoming_type,
+            )
+        )
+    else:
+        existing_result = await db.execute(
+            select(WorkScheduleEntry).where(WorkScheduleEntry.schedule_item_id == item_id)
+        )
     for entry in existing_result.scalars().all():
         await db.delete(entry)
 
