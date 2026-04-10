@@ -29,6 +29,7 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [copyToast, setCopyToast] = useState<string | null>(null);
+  const [logMenuOpen, setLogMenuOpen] = useState(false);
 
   const SB_W = collapsed ? 64 : 240;
 
@@ -47,12 +48,17 @@ export default function Layout() {
     setTimeout(() => setCopyToast(null), 2500);
   };
 
+  const fetchLogLines = async () => {
+    const r = await client.get('/notifications?limit=200');
+    const entries = r.data as {created_at: string; title: string; body?: string}[];
+    return entries.map(n =>
+      `[${new Date(n.created_at).toLocaleString('ru-RU')}] ${n.title}${n.body ? ': ' + n.body : ''}`
+    );
+  };
+
   const copyLogs = async () => {
     try {
-      const r = await client.get('/notifications?limit=50');
-      const lines = (r.data as {created_at: string; title: string; body?: string}[]).map(n =>
-        `[${new Date(n.created_at).toLocaleString('ru-RU')}] ${n.title}${n.body ? ': ' + n.body : ''}`
-      );
+      const lines = await fetchLogLines();
       const text = lines.length ? lines.join('\n') : '(нет записей)';
       const ta = document.createElement('textarea');
       ta.value = text;
@@ -65,6 +71,25 @@ export default function Layout() {
     } catch {
       showToast('✗ Ошибка копирования');
     }
+    setLogMenuOpen(false);
+  };
+
+  const downloadLogs = async () => {
+    try {
+      const lines = await fetchLogLines();
+      const text = lines.length ? lines.join('\n') : '(нет записей)';
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `logs_${new Date().toISOString().slice(0, 10)}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`✓ Скачано ${lines.length} записей`);
+    } catch {
+      showToast('✗ Ошибка скачивания');
+    }
+    setLogMenuOpen(false);
   };
 
   return (
@@ -254,6 +279,56 @@ export default function Layout() {
         <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', background: C.pageBg, padding: '12px 4px' }}>
           <Outlet />
         </main>
+      </div>
+
+      {/* Floating log buttons — bottom right */}
+      <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 500, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+        {logMenuOpen && (
+          <>
+            <button
+              onClick={copyLogs}
+              title="Скопировать логи"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 14px', borderRadius: 8, border: 'none',
+                background: '#1565c0', color: '#fff',
+                cursor: 'pointer', fontSize: 13, fontWeight: 500,
+                boxShadow: '0 2px 8px rgba(0,0,0,.2)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              📋 Скопировать логи
+            </button>
+            <button
+              onClick={downloadLogs}
+              title="Скачать логи"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 14px', borderRadius: 8, border: 'none',
+                background: '#2e7d32', color: '#fff',
+                cursor: 'pointer', fontSize: 13, fontWeight: 500,
+                boxShadow: '0 2px 8px rgba(0,0,0,.2)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              ⬇ Скачать логи (.txt)
+            </button>
+          </>
+        )}
+        <button
+          onClick={() => setLogMenuOpen(v => !v)}
+          title="Логи"
+          style={{
+            width: 44, height: 44, borderRadius: '50%', border: 'none',
+            background: logMenuOpen ? '#555' : '#333', color: '#fff',
+            cursor: 'pointer', fontSize: 18,
+            boxShadow: '0 4px 14px rgba(0,0,0,.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background .15s',
+          }}
+        >
+          {logMenuOpen ? '✕' : '📋'}
+        </button>
       </div>
 
       {/* Toast notification */}
