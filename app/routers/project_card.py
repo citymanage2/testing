@@ -164,6 +164,9 @@ async def upload_gallery_image(
 
 @router.get("/{project_id}/gallery/{img_id}")
 async def get_gallery_image(project_id: str, img_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    project = await db.get(Project, project_id)
+    if not project or project.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Not found")
     row = await db.get(ProjectGallery, img_id)
     if not row or row.project_id != project_id:
         raise HTTPException(status_code=404, detail="Not found")
@@ -172,6 +175,9 @@ async def get_gallery_image(project_id: str, img_id: int, current_user: User = D
 
 @router.delete("/{project_id}/gallery/{img_id}")
 async def delete_gallery_image(project_id: str, img_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    project = await db.get(Project, project_id)
+    if not project or project.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Not found")
     row = await db.get(ProjectGallery, img_id)
     if not row or row.project_id != project_id:
         raise HTTPException(status_code=404, detail="Not found")

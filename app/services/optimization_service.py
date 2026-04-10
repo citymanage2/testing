@@ -1,10 +1,14 @@
 """Estimate cost optimization via Claude AI."""
 import uuid
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.estimate_item import EstimateItem
 from app.services import claude_service
+from app.services.claude_service import HAIKU, SONNET
 from app.services.snapshot_service import snapshot_service
+
+log = structlog.get_logger()
 
 
 class OptimizationService:
@@ -35,7 +39,7 @@ class OptimizationService:
   ],
   "total_savings": 0
 }}"""
-        result = await claude_service.complete_json(system, [{"role": "user", "content": prompt}])
+        result = await claude_service.complete_json(system, [{"role": "user", "content": prompt}], model=SONNET)
         return result if isinstance(result, dict) else {"items": result, "total_savings": 0}
 
     async def execute_optimization(self, db: AsyncSession, task_id: str, item_ids: list[str]):
@@ -49,13 +53,13 @@ class OptimizationService:
             prompt = f"""Позиция: {item.name}, ед: {item.unit}, цена работ: {item.work_price}, цена материала: {item.mat_price}.
 Верни JSON: {{"work_price": 0, "mat_price": 0, "name": "новое название или то же"}}"""
             try:
-                result = await claude_service.complete_json(system, [{"role": "user", "content": prompt}])
+                result = await claude_service.complete_json(system, [{"role": "user", "content": prompt}], model=HAIKU)
                 item.work_price = float(result.get("work_price", item.work_price))
                 item.mat_price = float(result.get("mat_price", item.mat_price))
                 item.total = (item.work_price + item.mat_price) * item.quantity
                 item.is_optimized = True
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning("optimization_item_failed", item_id=item_id, error=str(e))
 
         await db.commit()
 

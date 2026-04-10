@@ -27,8 +27,11 @@ export default function BatchAnalogueModal({ taskId, items, onClose, onApplied }
         for (const r of results) {
             if (!r.selected)
                 continue;
+            const analogue = r.analogues.find(a => a.id === r.selected);
+            if (!analogue)
+                continue;
             try {
-                await client.post(`${base}/${r.item.id}/apply-analogue`, { analogue_id: r.selected });
+                await client.post(`${base}/${r.item.id}/apply-analogue`, { price: analogue.price, source_url: analogue.source_url });
                 applied++;
             }
             catch { }

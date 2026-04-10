@@ -145,7 +145,7 @@ export default function PurchaseRequests({ projectId }: { projectId: string }) {
   };
 
   const saveDelivery = async (purchaseId: string, itemId: string, qty: string) => {
-    await client.patch(`/projects/${projectId}/purchases/${purchaseId}/items/${itemId}`, { qty_delivered: Number(qty) });
+    await client.patch(`/projects/${projectId}/purchases/${purchaseId}/items/${itemId}`, { quantity_delivered: Number(qty) });
     await loadItems(purchaseId);
     setDeliveryEdit(prev => {
       const n = { ...prev };

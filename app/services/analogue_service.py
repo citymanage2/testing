@@ -7,8 +7,9 @@ from app.models.estimate_item import EstimateItem
 from app.services.snapshot_service import snapshot_service
 from app.config import settings
 
+from app.services.claude_service import SONNET
 _client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-MODEL = "claude-opus-4-6"
+MODEL = SONNET
 
 
 async def _find_with_web_search(item_name: str, item_type: str, unit: str,

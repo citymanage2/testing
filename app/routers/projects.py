@@ -57,7 +57,7 @@ async def list_projects(current_user: CurrentUser, db: AsyncSession = Depends(ge
 @router.get("/{project_id}", response_model=ProjectDetailResponse)
 async def get_project(project_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     project = await db.get(Project, project_id)
-    if not project:
+    if not project or project.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Project not found")
     tasks_result = await db.execute(select(Task).where(Task.project_id == project_id))
     tasks = tasks_result.scalars().all()
@@ -82,7 +82,7 @@ async def update_project(project_id: str, body: ProjectUpdate, current_user: Cur
 @router.delete("/{project_id}", status_code=204)
 async def delete_project(project_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     project = await db.get(Project, project_id)
-    if not project:
+    if not project or project.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Project not found")
     await db.delete(project)
     await db.commit()
@@ -106,6 +106,7 @@ async def update_estimate_status(task_id: str, body: EstimateStatusUpdate, curre
     task.estimate_status = body.status
     task.estimate_status_updated_at = datetime.now(timezone.utc)
     task.estimate_status_updated_by = body.updated_by
+    task.updated_at = datetime.now(timezone.utc)
     await db.commit()
     return {"ok": True}
 
