@@ -46,13 +46,25 @@ async def _check_transition_conditions(project, to_stage: str, db: AsyncSession)
     """Returns error message if condition not met, None if OK."""
     if to_stage == "ESTIMATION":
         return None  # always allowed
-    if to_stage in ("OPTIMIZATION", "APPROVAL"):
+    if to_stage == "OPTIMIZATION":
+        # Need at least one non-empty estimate (has at least one item)
+        tasks_r = await db.execute(select(Task).where(Task.project_id == project.id))
+        tasks = tasks_r.scalars().all()
+        if not tasks:
+            return "Для перехода в Оптимизацию необходима хотя бы одна непустая смета"
+        task_ids = [t.id for t in tasks]
+        items_r = await db.execute(
+            select(EstimateItem.id).where(EstimateItem.task_id.in_(task_ids)).limit(1)
+        )
+        if not items_r.scalars().first():
+            return "Для перехода в Оптимизацию необходима хотя бы одна непустая смета"
+    if to_stage == "APPROVAL":
         # Need at least one frozen estimate
         tasks_r = await db.execute(select(Task).where(Task.project_id == project.id))
         tasks = tasks_r.scalars().all()
-        frozen = [t for t in tasks if t.estimate_status == "frozen"]
+        frozen = [t for t in tasks if t.estimate_status in ("frozen", "signed")]
         if not frozen:
-            return "Для перехода необходима хотя бы одна замороженная смета"
+            return "Для перехода в Согласование необходима хотя бы одна замороженная смета"
     if to_stage == "EXECUTION":
         if not getattr(project, "project_manager_id", None) and not getattr(project, "project_manager_name", None):
             return "Назначьте руководителя проекта перед переходом в Реализацию"
@@ -71,6 +83,20 @@ async def _check_transition_conditions(project, to_stage: str, db: AsyncSession)
         )
         if not acts_r.scalars().first():
             return "Для сдачи объекта необходим хотя бы один подписанный акт КС-2"
+    if to_stage == "CLOSED":
+        from app.models.warranty_claim import WarrantyClaim
+        open_claims_r = await db.execute(
+            select(WarrantyClaim).where(
+                WarrantyClaim.project_id == project.id,
+                WarrantyClaim.status.notin_(["resolved", "closed"]),
+            )
+        )
+        open_claims = open_claims_r.scalars().all()
+        if open_claims:
+            return (
+                f"Нельзя закрыть проект: есть {len(open_claims)} "
+                "открытых гарантийных претензий. Закройте их перед завершением проекта."
+            )
     return None
 
 

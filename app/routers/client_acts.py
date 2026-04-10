@@ -14,6 +14,7 @@ from app.models.project import Project
 from app.models.client_act import ClientKs2Act, ClientKs2ActItem
 from app.models.estimate_item import EstimateItem
 from app.models.task import Task
+from app.models.contractor import Contractor
 
 router = APIRouter()
 
@@ -24,6 +25,9 @@ router = APIRouter()
 
 class ActCreate(BaseModel):
     act_number: str
+    # act_type: "client" (КС-2 с заказчиком) | "subcontractor" (КС-2 с подрядчиком)
+    act_type: str = "client"
+    task_id: Optional[str] = None
     period_start: Optional[date] = None
     period_end: Optional[date] = None
     contractor_id: Optional[str] = None
@@ -43,6 +47,8 @@ class ActPatch(BaseModel):
 class ActResponse(BaseModel):
     id: str
     project_id: str
+    task_id: Optional[str]
+    act_type: str
     act_number: str
     status: str
     period_start: Optional[date]
@@ -102,6 +108,29 @@ async def _get_project_owned(project_id: str, user_id: str, db: AsyncSession) ->
     return project
 
 
+async def _get_client_actioned_qty(estimate_item_id: str, project_id: str, db: AsyncSession) -> float:
+    """
+    Возвращает суммарный объём, закрытый заказчиком по данной позиции
+    (только из клиентских актов со статусом signed).
+    Используется для контроля запрета №9.4 ТЗ.
+    """
+    result = await db.execute(
+        select(func.sum(ClientKs2ActItem.quantity_presented)).select_from(
+            ClientKs2ActItem
+        ).join(
+            ClientKs2Act, ClientKs2Act.id == ClientKs2ActItem.act_id
+        ).where(
+            and_(
+                ClientKs2ActItem.estimate_item_id == estimate_item_id,
+                ClientKs2Act.project_id == project_id,
+                ClientKs2Act.act_type == "client",
+                ClientKs2Act.status == "signed",
+            )
+        )
+    )
+    return result.scalar() or 0.0
+
+
 async def _enrich_act(act: ClientKs2Act, db: AsyncSession) -> ActResponse:
     items_result = await db.execute(
         select(ClientKs2ActItem).where(ClientKs2ActItem.act_id == act.id)
@@ -115,6 +144,8 @@ async def _enrich_act(act: ClientKs2Act, db: AsyncSession) -> ActResponse:
     return ActResponse(
         id=act.id,
         project_id=act.project_id,
+        task_id=getattr(act, "task_id", None),
+        act_type=getattr(act, "act_type", "client"),
         act_number=act.act_number,
         status=act.status,
         period_start=getattr(act, "period_start", None),
@@ -137,12 +168,17 @@ async def list_acts(
     project_id: str,
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
+    task_id: Optional[str] = None,
+    act_type: Optional[str] = None,
 ):
     await _get_project_owned(project_id, current_user.id, db)
 
-    result = await db.execute(
-        select(ClientKs2Act).where(ClientKs2Act.project_id == project_id)
-    )
+    q = select(ClientKs2Act).where(ClientKs2Act.project_id == project_id)
+    if task_id:
+        q = q.where(ClientKs2Act.task_id == task_id)
+    if act_type:
+        q = q.where(ClientKs2Act.act_type == act_type)
+    result = await db.execute(q)
     acts = result.scalars().all()
     return [await _enrich_act(act, db) for act in acts]
 
@@ -156,9 +192,40 @@ async def create_act(
 ):
     await _get_project_owned(project_id, current_user.id, db)
 
+    # Если передан task_id — берём project_id из задачи, игнорируя URL-параметр
+    effective_project_id = project_id
+    if body.task_id:
+        task = await db.get(Task, body.task_id)
+        if task and task.project_id:
+            effective_project_id = task.project_id
+
+    # Запреты №9, №10: тип акта должен соответствовать типу сметы
+    if body.task_id:
+        source_task = await db.get(Task, body.task_id)
+        if source_task:
+            source_estimate_type = getattr(source_task, "estimate_type", "main") or "main"
+            if body.act_type == "client" and source_estimate_type == "subcontractor":
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "КС-2 с заказчиком формируется только из сметы с заказчиком. "
+                        "Указанная смета является сметой подрядчика."
+                    ),
+                )
+            if body.act_type == "subcontractor" and source_estimate_type != "subcontractor":
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "КС-2 с подрядчиком формируется только из сметы с подрядчиком. "
+                        "Указанная смета является клиентской сметой."
+                    ),
+                )
+
     act = ClientKs2Act(
         id=str(uuid.uuid4()),
-        project_id=project_id,
+        project_id=effective_project_id,
+        task_id=body.task_id,
+        act_type=body.act_type,
         act_number=body.act_number,
         status="draft",
         period_start=body.period_start,
@@ -311,14 +378,51 @@ async def replace_act_items(
                 status_code=400,
                 detail=f"Estimate item {line.estimate_item_id} not found",
             )
-        # Ensure the item belongs to a CLIENT (not subcontractor) estimate
         source_task = await db.get(Task, est_item.task_id)
-        if source_task and getattr(source_task, "estimate_type", None) == "subcontractor":
+        source_est_type = getattr(source_task, "estimate_type", "main") if source_task else "main"
+
+        # Запрет №10: КС-2 с заказчиком — только из клиентской сметы
+        if act.act_type == "client" and source_est_type == "subcontractor":
             raise HTTPException(
                 status_code=400,
                 detail=f"Позиция '{est_item.name}' принадлежит смете субподрядчика. "
                        "КС-2 с заказчиком заполняется только по клиентской смете.",
             )
+        # Запрет №9: КС-2 с подрядчиком — только из сметы подрядчика
+        if act.act_type == "subcontractor" and source_est_type != "subcontractor":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Позиция '{est_item.name}' принадлежит клиентской смете. "
+                       "КС-2 с подрядчиком заполняется только по смете подрядчика.",
+            )
+        # Запрет 9.4 ТЗ: подрядчику можно закрыть только то, что закрыл заказчик
+        if act.act_type == "subcontractor":
+            # Ищем позицию клиентской сметы с таким же именем в том же проекте
+            client_tasks_r = await db.execute(
+                select(Task).where(
+                    Task.project_id == project_id,
+                    Task.estimate_type.notin_(["subcontractor"]),
+                )
+            )
+            client_task_ids = [t.id for t in client_tasks_r.scalars().all()]
+            client_item_r = await db.execute(
+                select(EstimateItem).where(
+                    EstimateItem.task_id.in_(client_task_ids),
+                    EstimateItem.name == est_item.name,
+                ).limit(1)
+            )
+            client_item = client_item_r.scalars().first()
+            if client_item:
+                client_actioned = await _get_client_actioned_qty(client_item.id, project_id, db)
+                if line.quantity_presented > client_actioned:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Позиция '{est_item.name}': подрядчику нельзя закрыть больше, "
+                            f"чем принято заказчиком ({client_actioned} {est_item.unit or ''}). "
+                            f"Запрошено: {line.quantity_presented}."
+                        ),
+                    )
 
         # Sum from other non-cancelled acts (exclude current act)
         already_result = await db.execute(

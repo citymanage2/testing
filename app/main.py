@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -9,6 +10,7 @@ from app.database import engine, SessionLocal
 from app.models import Base
 from app.models.user import User
 from app.services.price_service import price_service
+from app.services.warranty_scheduler import warranty_scheduler_loop
 from app.routers import auth, tasks, projects, admin, results
 from app.routers import company, contractors, catalog, calculator, documents, project_card, work_acceptances, ai_assist
 from app.routers import project_lifecycle, project_docs, contracts, work_schedule, client_acts, purchase_requests, notifications
@@ -36,7 +38,16 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
+    # Start warranty notification scheduler
+    scheduler_task = asyncio.create_task(warranty_scheduler_loop())
+
     yield
+
+    scheduler_task.cancel()
+    try:
+        await scheduler_task
+    except asyncio.CancelledError:
+        pass
     await engine.dispose()
 
 

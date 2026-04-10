@@ -91,19 +91,84 @@ async def save_estimate_item_to_catalog(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Добавить одну позицию из сметы в каталог. Если совпадение по имени+типу — обновляет цены."""
     item = await db.get(EstimateItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+    item_type = "material" if item.type == "Материал" else "work"
+    # Проверяем дубль
+    existing_r = await db.execute(
+        select(PriceCatalog).where(
+            PriceCatalog.user_id == current_user.id,
+            PriceCatalog.name == item.name,
+            PriceCatalog.item_type == item_type,
+        )
+    )
+    existing = existing_r.scalars().first()
+    if existing:
+        existing.unit = item.unit
+        existing.work_price = item.work_price
+        existing.mat_price = item.mat_price
+        existing.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(existing)
+        return _out(existing)
     row = PriceCatalog(
         id=str(uuid.uuid4()), user_id=current_user.id,
-        item_type="material" if item.type == "Материал" else "work",
-        name=item.name, unit=item.unit,
+        item_type=item_type, name=item.name, unit=item.unit,
         work_price=item.work_price, mat_price=item.mat_price, tags=[],
     )
     db.add(row)
     await db.commit()
     await db.refresh(row)
     return _out(row)
+
+
+class BatchFromEstimateRequest(BaseModel):
+    item_ids: list[str]
+
+
+@router.post("/from-estimate-items/batch")
+async def batch_save_estimate_items_to_catalog(
+    body: BatchFromEstimateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Пакетное добавление нескольких позиций из сметы в каталог.
+    ТЗ, раздел 16: «добавление позиций из сметы в каталог одной кнопкой».
+    Возвращает: added (новые), updated (обновлены цены), skipped (нет названия).
+    """
+    added = updated = skipped = 0
+    for item_id in body.item_ids:
+        item = await db.get(EstimateItem, item_id)
+        if not item or not item.name:
+            skipped += 1
+            continue
+        item_type = "material" if item.type == "Материал" else "work"
+        existing_r = await db.execute(
+            select(PriceCatalog).where(
+                PriceCatalog.user_id == current_user.id,
+                PriceCatalog.name == item.name,
+                PriceCatalog.item_type == item_type,
+            )
+        )
+        existing = existing_r.scalars().first()
+        if existing:
+            existing.unit = item.unit
+            existing.work_price = item.work_price
+            existing.mat_price = item.mat_price
+            existing.updated_at = datetime.now(timezone.utc)
+            updated += 1
+        else:
+            db.add(PriceCatalog(
+                id=str(uuid.uuid4()), user_id=current_user.id,
+                item_type=item_type, name=item.name, unit=item.unit,
+                work_price=item.work_price, mat_price=item.mat_price, tags=[],
+            ))
+            added += 1
+    await db.commit()
+    return {"added": added, "updated": updated, "skipped": skipped}
 
 
 @router.get("/duplicates/count")

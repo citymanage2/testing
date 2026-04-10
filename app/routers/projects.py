@@ -26,6 +26,17 @@ router = APIRouter()
 LOCKED_ESTIMATE_STATUSES = {"signed"}
 LOCKED_PROJECT_STAGES = {"EXECUTION", "HANDOVER", "WARRANTY", "CLOSED"}
 
+# Allowed estimate status transitions (from → to).
+# Legacy statuses (uploaded, calculated, optimized, ready) can freely move to any new status.
+ESTIMATE_TRANSITION_MAP: dict[str, list[str]] = {
+    "draft": ["internal_review"],
+    "internal_review": ["draft", "frozen"],
+    "frozen": ["internal_review", "signed"],
+    "signed": ["frozen", "internal_review"],
+    "archived": [],
+}
+_LEGACY_STATUSES = {"uploaded", "calculated", "optimized", "ready"}
+
 async def _check_estimate_editable(task: Task, db: AsyncSession) -> Optional[str]:
     """Returns error message if estimate is not editable, None if OK."""
     if task.estimate_status in LOCKED_ESTIMATE_STATUSES:
@@ -126,10 +137,20 @@ async def add_estimate_status_log(
     db: AsyncSession = Depends(get_db),
 ):
     from app.models.estimate_item_log import EstimateItemLog
-    # Block changes to signed estimates
     existing_task = await db.get(Task, task_id)
-    if existing_task and existing_task.estimate_status == "signed":
-        raise HTTPException(status_code=403, detail="Подписанная смета не может быть изменена")
+    if existing_task:
+        current_status = existing_task.estimate_status
+        # Validate transition unless coming from a legacy status or None
+        if current_status not in _LEGACY_STATUSES and current_status is not None:
+            allowed = ESTIMATE_TRANSITION_MAP.get(current_status, [])
+            if body.status not in allowed:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Недопустимый переход статуса сметы: «{current_status}» → «{body.status}». "
+                        f"Допустимые переходы: {allowed or ['нет']}"
+                    ),
+                )
     log = EstimateItemLog(
         id=str(uuid.uuid4()),
         task_id=task_id,
@@ -282,12 +303,43 @@ async def project_totals(project_id: str, current_user: CurrentUser, db: AsyncSe
     smeta_tasks = [t for t in tasks if t.task_type in smeta_types]
     task_ids = [t.id for t in smeta_tasks]
     if not task_ids:
-        return ProjectTotals(total_work=0, total_mat=0, total=0, total_vat=0, tasks_count=len(smeta_tasks))
+        return ProjectTotals(total_work=0, total_mat=0, total=0, total_vat=0, tasks_count=0)
+
     items = (await db.execute(select(EstimateItem).where(EstimateItem.task_id.in_(task_ids)))).scalars().all()
-    tw = sum(i.work_price * i.quantity for i in items)
-    tm = sum(i.mat_price * i.quantity for i in items)
+
+    # Build lookup: task_id → estimate_type
+    type_map = {t.id: (getattr(t, "estimate_type", "main") or "main") for t in smeta_tasks}
+
+    client_tw = client_tm = sub_tw = sub_tm = 0.0
+    for i in items:
+        est_type = type_map.get(i.task_id, "main")
+        wp = i.work_price * i.quantity
+        mp = i.mat_price * i.quantity
+        if est_type == "subcontractor":
+            sub_tw += wp
+            sub_tm += mp
+        else:
+            client_tw += wp
+            client_tm += mp
+
+    tw = client_tw + sub_tw
+    tm = client_tm + sub_tm
     total = tw + tm
-    return ProjectTotals(total_work=tw, total_mat=tm, total=total, total_vat=total * settings.vat_rate / 100, tasks_count=len(smeta_tasks))
+    client_total = client_tw + client_tm
+    sub_total = sub_tw + sub_tm
+
+    return ProjectTotals(
+        total_work=tw, total_mat=tm, total=total,
+        total_vat=total * settings.vat_rate / 100,
+        tasks_count=len(smeta_tasks),
+        client_total=client_total,
+        client_total_work=client_tw,
+        client_total_mat=client_tm,
+        subcontractor_total=sub_total,
+        subcontractor_total_work=sub_tw,
+        subcontractor_total_mat=sub_tm,
+        profit=client_total - sub_total,
+    )
 
 
 @router.get("/estimates/{task_id}/export")
@@ -300,10 +352,76 @@ async def export_estimate(task_id: str, current_user: CurrentUser, db: AsyncSess
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
+@router.patch("/estimates/{task_id}/type")
+async def set_estimate_type(
+    task_id: str,
+    body: dict,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Устанавливает тип сметы: "main" (клиентская) или "subcontractor".
+    Смету подрядчика можно создать ТОЛЬКО если в проекте есть хотя бы одна
+    подписанная смета заказчика (Абсолютный запрет №11 ТЗ).
+    """
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    new_type = body.get("estimate_type")
+    if new_type not in ("main", "subcontractor"):
+        raise HTTPException(status_code=400, detail="estimate_type must be 'main' or 'subcontractor'")
+    if new_type == "subcontractor" and task.project_id:
+        # Абсолютный запрет №11: нужна хотя бы одна подписанная клиентская смета
+        tasks_r = await db.execute(select(Task).where(Task.project_id == task.project_id))
+        all_tasks = tasks_r.scalars().all()
+        signed_client = [
+            t for t in all_tasks
+            if t.id != task_id
+            and getattr(t, "estimate_type", "main") != "subcontractor"
+            and t.estimate_status == "signed"
+        ]
+        if not signed_client:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Нельзя создать смету подрядчика: в проекте нет ни одной "
+                    "подписанной сметы с заказчиком. Сначала подпишите смету заказчика."
+                ),
+            )
+    task.estimate_type = new_type
+    await db.commit()
+    return {"ok": True, "estimate_type": new_type}
+
+
 @router.post("/{project_id}/import-estimate")
-async def import_estimate(*, project_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db), file: UploadFile = File(...)):
+async def import_estimate(
+    *,
+    project_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+    file: UploadFile = File(...),
+    estimate_type: str = "main",
+):
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="Only .xlsx files allowed")
+    if estimate_type not in ("main", "subcontractor"):
+        raise HTTPException(status_code=400, detail="estimate_type must be 'main' or 'subcontractor'")
+    if estimate_type == "subcontractor":
+        tasks_r = await db.execute(select(Task).where(Task.project_id == project_id))
+        all_tasks = tasks_r.scalars().all()
+        signed_client = [
+            t for t in all_tasks
+            if getattr(t, "estimate_type", "main") != "subcontractor"
+            and t.estimate_status == "signed"
+        ]
+        if not signed_client:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Нельзя импортировать смету подрядчика: в проекте нет ни одной "
+                    "подписанной сметы с заказчиком."
+                ),
+            )
     data = await file.read()
     from app.services.excel_service import parse_estimate_excel
     rows = parse_estimate_excel(data)
@@ -311,8 +429,9 @@ async def import_estimate(*, project_id: str, current_user: CurrentUser, db: Asy
         raise HTTPException(status_code=400, detail="No items found in file")
     task = Task(
         id=str(uuid.uuid4()), task_type="IMPORT_EXCEL", user_id=current_user.id,
-        project_id=project_id, status="completed", estimate_status="calculated",
+        project_id=project_id, status="completed", estimate_status="draft",
         user_prompt=f"Импорт из {file.filename}", chat_history=[],
+        estimate_type=estimate_type,
     )
     db.add(task)
     await db.flush()

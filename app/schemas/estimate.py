@@ -104,6 +104,14 @@ class ProjectTotals(BaseModel):
     total: float
     total_vat: float
     tasks_count: int
+    # Раздельные итоги по типу сметы (Раздел 6.2 ТЗ)
+    client_total: float = 0.0
+    client_total_work: float = 0.0
+    client_total_mat: float = 0.0
+    subcontractor_total: float = 0.0
+    subcontractor_total_work: float = 0.0
+    subcontractor_total_mat: float = 0.0
+    profit: float = 0.0  # client_total - subcontractor_total
 
 
 class PairCheckResult(BaseModel):
