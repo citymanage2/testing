@@ -500,7 +500,7 @@ export default function ProjectDetail() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 8 }}>
             <h4 style={{ margin: 0, fontSize: 14, color: C.text, fontWeight: 600 }}>Сметы с субподрядчиком</h4>
             <button style={btnOutline('sm')} onClick={() => {
-              setSubModalForm({ sourceTaskId: '', name: '', includeMatls: true });
+              setSubModalForm({ sourceTaskId: '', name: '' });
               setShowSubModal(true);
             }}>+ Субподрядная</button>
           </div>
