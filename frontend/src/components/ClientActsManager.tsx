@@ -10,6 +10,7 @@ interface Contractor { id: string; name: string }
 interface Act {
   id: string;
   act_number: string;
+  act_type: 'client' | 'subcontractor';
   status: 'draft' | 'sent' | 'revision' | 'signed' | 'cancelled';
   total_amount: number;
   period_start: string;
@@ -44,6 +45,20 @@ const STATUS_LABELS: Record<string, string> = {
   draft: 'Черновик', sent: 'Отправлен', revision: 'На доработке', signed: 'Подписан', cancelled: 'Отменён',
 };
 
+const ACT_TYPE_LABELS: Record<string, string> = {
+  client: 'С заказчиком',
+  subcontractor: 'С подрядчиком',
+};
+
+function actTypeBadge(t: string) {
+  const isClient = t === 'client';
+  return (
+    <span style={badge(isClient ? C.primary : C.warning, isClient ? C.primaryBg : C.warningBg)}>
+      {ACT_TYPE_LABELS[t] ?? t}
+    </span>
+  );
+}
+
 function statusBadge(s: string) {
   const map: Record<string, [string, string]> = {
     draft: [C.textMuted, '#f1f5f9'],
@@ -70,7 +85,7 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
 
   // new act modal
   const [actModal, setActModal] = useState(false);
-  const [actForm, setActForm] = useState({ act_number: '', contractor_id: '', period_start: '', period_end: '' });
+  const [actForm, setActForm] = useState({ act_number: '', act_type: 'client', contractor_id: '', period_start: '', period_end: '' });
   const [savingAct, setSavingAct] = useState(false);
 
   // items editor modal
@@ -206,6 +221,7 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
                     </button>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>№ {act.act_number}</span>
                     {statusBadge(act.status)}
+                    {actTypeBadge(act.act_type)}
                     <span style={{ fontSize: 13, color: C.textSec }}>{act.contractor_name}</span>
                     <span style={{ fontSize: 12, color: C.textMuted }}>
                       {fmt(act.period_start)} – {fmt(act.period_end)}
@@ -348,6 +364,13 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
               <label style={LBL}>
                 Номер акта
                 <input style={INPUT} value={actForm.act_number} onChange={e => setActForm(f => ({ ...f, act_number: e.target.value }))} />
+              </label>
+              <label style={LBL}>
+                Тип акта
+                <select style={INPUT} value={actForm.act_type} onChange={e => setActForm(f => ({ ...f, act_type: e.target.value }))}>
+                  <option value="client">С заказчиком</option>
+                  <option value="subcontractor">С подрядчиком</option>
+                </select>
               </label>
               <label style={LBL}>
                 Заказчик / подрядчик
