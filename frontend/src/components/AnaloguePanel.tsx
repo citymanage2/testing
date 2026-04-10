@@ -18,9 +18,9 @@ export default function AnaloguePanel({ taskId, itemId, isAnalogue, onClose, onA
       .finally(() => setLoading(false));
   }, [taskId, itemId]);
 
-  async function apply(id: string) {
-    setApplying(id);
-    try { await client.post(`${base}/apply-analogue`, { analogue_id: id }); onApplied(); }
+  async function apply(analogue: Analogue) {
+    setApplying(analogue.id);
+    try { await client.post(`${base}/apply-analogue`, { price: analogue.price, source_url: analogue.source_url }); onApplied(); }
     catch { alert('Ошибка применения'); }
     finally { setApplying(null); }
   }
@@ -61,7 +61,7 @@ export default function AnaloguePanel({ taskId, itemId, isAnalogue, onClose, onA
             {a.diff && <div style={{ fontSize: 12, color: '#666', fontStyle: 'italic', marginBottom: 6 }}>{a.diff}</div>}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {a.source_url && <a href={a.source_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#1565c0' }}>🔗 {a.source_url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]} ↗</a>}
-              <button onClick={() => apply(a.id)} disabled={applying === a.id} style={{ marginLeft: 'auto', padding: '5px 14px', background: applying === a.id ? '#bdbdbd' : '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}>
+              <button onClick={() => apply(a)} disabled={applying === a.id} style={{ marginLeft: 'auto', padding: '5px 14px', background: applying === a.id ? '#bdbdbd' : '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}>
                 {applying === a.id ? '...' : 'Применить'}
               </button>
             </div>

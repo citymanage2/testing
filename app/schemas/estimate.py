@@ -90,7 +90,8 @@ class OptimizeExecuteRequest(BaseModel):
 
 
 class ApplyAnalogueRequest(BaseModel):
-    analogue_id: str
+    price: float
+    source_url: Optional[str] = None
 
 
 class MoveTaskRequest(BaseModel):

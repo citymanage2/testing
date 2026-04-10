@@ -108,7 +108,7 @@ export default function PurchaseRequests({ projectId }) {
         setEditItems(items => items.map((it, i) => i === idx ? { ...it, [field]: val } : it));
     };
     const saveDelivery = async (purchaseId, itemId, qty) => {
-        await client.patch(`/projects/${projectId}/purchases/${purchaseId}/items/${itemId}`, { qty_delivered: Number(qty) });
+        await client.patch(`/projects/${projectId}/purchases/${purchaseId}/items/${itemId}`, { quantity_delivered: Number(qty) });
         await loadItems(purchaseId);
         setDeliveryEdit(prev => {
             const n = { ...prev };

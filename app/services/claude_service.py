@@ -1,6 +1,11 @@
 """
 Thin wrapper around the Anthropic Claude API.
 All AI calls go through here so the rest of the codebase stays clean.
+
+Model selection guidelines:
+  OPUS    — smeta from project docs (large context, max accuracy required)
+  SONNET  — smeta from TZ/list, OCR, reports, analogue search
+  HAIKU   — optimization suggestions (simple JSON, high volume)
 """
 import json
 from json_repair import repair_json
@@ -9,17 +14,22 @@ from app.config import settings
 
 client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
-MODEL = "claude-opus-4-6"
+OPUS = "claude-opus-4-6"
+SONNET = "claude-sonnet-4-6"
+HAIKU = "claude-haiku-4-5-20251001"
+
+# Default for callers that don't specify a model
+MODEL = OPUS
 MAX_TOKENS = 16000
 
 
-async def complete(system: str, messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
+async def complete(system: str, messages: list[dict], max_tokens: int = MAX_TOKENS, model: str = MODEL) -> str:
     import asyncio
     from anthropic import APIStatusError
     for attempt in range(5):
         try:
             response = await client.messages.create(
-                model=MODEL, max_tokens=max_tokens, system=system, messages=messages,
+                model=model, max_tokens=max_tokens, system=system, messages=messages,
             )
             return response.content[0].text
         except APIStatusError as e:
@@ -29,8 +39,8 @@ async def complete(system: str, messages: list[dict], max_tokens: int = MAX_TOKE
             raise
 
 
-async def complete_json(system: str, messages: list[dict], max_tokens: int = MAX_TOKENS) -> dict | list:
-    text = await complete(system, messages, max_tokens)
+async def complete_json(system: str, messages: list[dict], max_tokens: int = MAX_TOKENS, model: str = MODEL) -> dict | list:
+    text = await complete(system, messages, max_tokens, model)
     text = text.strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[1] if "\n" in text else text

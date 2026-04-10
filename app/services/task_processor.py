@@ -13,6 +13,7 @@ from app.models.task_input_file import TaskInputFile
 from app.models.task_result import TaskResult
 from app.models.estimate_item import EstimateItem
 from app.services import claude_service
+from app.services.claude_service import OPUS, SONNET
 from app.services.price_service import price_service
 from app.services.excel_service import build_estimate_excel
 from app.services.pdf_service import build_report_pdf
@@ -45,6 +46,17 @@ TASK_SYSTEMS = {
 SMETA_TYPES = {
     "SMETA_FROM_LIST", "SMETA_FROM_TZ", "SMETA_FROM_TZ_PROJECT",
     "SMETA_FROM_PROJECT", "SMETA_FROM_EDC_PROJECT", "SMETA_FROM_GRAND_PROJECT", "SCAN_TO_EXCEL",
+}
+
+# Задачи с проектной документацией требуют Opus — большой контекст, максимальная точность.
+# Остальные задачи (ТЗ, списки, OCR, отчёты) достаточно обрабатываются Sonnet.
+TASK_MODELS = {
+    "SMETA_FROM_PROJECT":      OPUS,
+    "SMETA_FROM_TZ_PROJECT":   OPUS,
+    "SMETA_FROM_EDC_PROJECT":  OPUS,
+    "SMETA_FROM_GRAND_PROJECT": OPUS,
+    "LIST_FROM_TZ_PROJECT":    OPUS,
+    "LIST_FROM_PROJECT":       OPUS,
 }
 
 ESTIMATE_JSON_PROMPT = """
@@ -88,14 +100,15 @@ class TaskProcessor:
                 # Build messages for Claude
                 messages = self._build_messages(task, input_files)
                 system = TASK_SYSTEMS.get(task.task_type, TASK_SYSTEMS["SMETA_FROM_TZ"])
+                model = TASK_MODELS.get(task.task_type, SONNET)
 
                 task.progress_message = "Обработка документов через Claude AI..."
                 await db.commit()
 
                 if task.task_type in SMETA_TYPES:
-                    await self._process_smeta(db, task, system, messages)
+                    await self._process_smeta(db, task, system, messages, model)
                 else:
-                    await self._process_report(db, task, system, messages)
+                    await self._process_report(db, task, system, messages, model)
 
                 task.status = "completed"
                 task.progress_message = "Готово"
@@ -170,7 +183,7 @@ class TaskProcessor:
 
         return messages
 
-    async def _process_smeta(self, db, task: Task, system: str, messages: list):
+    async def _process_smeta(self, db, task: Task, system: str, messages: list, model: str):
         # Add JSON format instruction
         json_messages = messages + [{"role": "user", "content": ESTIMATE_JSON_PROMPT}] if messages[-1].get("content") != ESTIMATE_JSON_PROMPT else messages
 
@@ -178,11 +191,11 @@ class TaskProcessor:
         await db.commit()
 
         try:
-            result = await claude_service.complete_json(system, json_messages)
+            result = await claude_service.complete_json(system, json_messages, model=model)
         except json.JSONDecodeError:
             # Retry with explicit JSON request
             retry_msg = messages + [{"role": "user", "content": "Верни ТОЛЬКО JSON без пояснений. " + ESTIMATE_JSON_PROMPT}]
-            result = await claude_service.complete_json(system, retry_msg)
+            result = await claude_service.complete_json(system, retry_msg, model=model)
 
         raw_items = result.get("items", result) if isinstance(result, dict) else result
 
@@ -246,11 +259,11 @@ class TaskProcessor:
         db.add(TaskResult(task_id=task.id, file_name="smeta.xlsx", file_data=excel_data, mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
         await db.flush()
 
-    async def _process_report(self, db, task: Task, system: str, messages: list):
+    async def _process_report(self, db, task: Task, system: str, messages: list, model: str):
         task.progress_message = "Генерация отчёта..."
         await db.commit()
 
-        text = await claude_service.complete(system, messages)
+        text = await claude_service.complete(system, messages, model=model)
 
         task.chat_history = task.chat_history + [{"role": "assistant", "content": text}]
 
