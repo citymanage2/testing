@@ -4,7 +4,6 @@ Each task type calls Claude with appropriate context and produces results.
 """
 import uuid
 import json
-import base64
 from datetime import datetime, timezone
 from sqlalchemy import select
 from app.database import SessionLocal
@@ -13,11 +12,12 @@ from app.models.task_input_file import TaskInputFile
 from app.models.task_result import TaskResult
 from app.models.estimate_item import EstimateItem
 from app.services import claude_service
-from app.services.claude_service import OPUS, SONNET
+from app.services.claude_service import OPUS, SONNET, MAX_TOKENS_SMETA
 from app.services.price_service import price_service
 from app.services.excel_service import build_estimate_excel
 from app.services.pdf_service import build_report_pdf
 from app.services.snapshot_service import snapshot_service
+from app.services.file_extractor import file_to_claude_part
 
 _PRICE_CONTEXT = (
     "Используй реальные рыночные цены России на 2024-2025 год. "
@@ -122,52 +122,22 @@ class TaskProcessor:
                 await db.commit()
 
     def _build_messages(self, task: Task, input_files: list) -> list[dict]:
-        content = []
-
-        # Add previous chat context
-        for msg in task.chat_history:
-            pass  # will be handled below
-
-        # Build current message content with files
-        parts = []
-        for f in input_files:
-            if f.mime_type in ("image/jpeg", "image/png", "image/gif", "image/webp"):
-                parts.append({
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": f.mime_type,
-                        "data": base64.standard_b64encode(f.file_data).decode(),
-                    },
-                })
-            else:
-                # Anthropic API only accepts application/pdf as document type
-                if f.mime_type == "application/pdf":
-                    parts.append({
-                        "type": "document",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "application/pdf",
-                            "data": base64.standard_b64encode(f.file_data).decode(),
-                        },
-                    })
-                else:
-                    parts.append({"type": "text", "text": f"[Файл: {f.file_name}, тип: {f.mime_type}]"})
+        # Convert uploaded files to Claude content blocks (DOCX/XLSX/XML are extracted to text)
+        file_parts = [file_to_claude_part(f.file_name, f.mime_type, f.file_data) for f in input_files]
 
         prompt_text = task.user_prompt or "Выполни задачу."
-        parts.append({"type": "text", "text": prompt_text})
 
-        # Full conversation: previous history + current request
-        # Sanitize history: remove document blocks with non-PDF media_type (legacy data)
+        # Sanitize history: drop legacy non-PDF document blocks that Anthropic rejects
         def _sanitize_content(content):
             if isinstance(content, list):
-                sanitized = []
-                for block in content:
-                    if isinstance(block, dict) and block.get("type") == "document":
-                        mt = block.get("source", {}).get("media_type", "")
-                        if mt != "application/pdf":
-                            continue  # drop non-PDF document blocks
-                    sanitized.append(block)
+                sanitized = [
+                    block for block in content
+                    if not (
+                        isinstance(block, dict)
+                        and block.get("type") == "document"
+                        and block.get("source", {}).get("media_type", "") != "application/pdf"
+                    )
+                ]
                 return sanitized or content
             return content
 
@@ -176,10 +146,17 @@ class TaskProcessor:
             {**msg, "content": _sanitize_content(msg.get("content", ""))}
             for msg in raw_history
         ]
+
         if not messages:
-            messages.append({"role": "user", "content": parts if len(parts) > 1 else parts[0] if parts else prompt_text})
+            # First call: attach files + prompt in one user message
+            first_content = file_parts + [{"type": "text", "text": prompt_text}]
+            messages.append({"role": "user", "content": first_content})
         else:
-            messages.append({"role": "user", "content": parts if len(parts) > 1 else (parts[0] if parts else prompt_text)})
+            # Subsequent call (user replied in chat): files were already in the history,
+            # just append the latest user message as-is (already added by send_message endpoint).
+            # If the last message is already the user's, don't duplicate it.
+            if messages[-1]["role"] != "user":
+                messages.append({"role": "user", "content": prompt_text})
 
         return messages
 
@@ -191,13 +168,20 @@ class TaskProcessor:
         await db.commit()
 
         try:
-            result = await claude_service.complete_json(system, json_messages, model=model)
+            result = await claude_service.complete_json(system, json_messages, max_tokens=MAX_TOKENS_SMETA, model=model)
         except json.JSONDecodeError:
             # Retry with explicit JSON request
             retry_msg = messages + [{"role": "user", "content": "Верни ТОЛЬКО JSON без пояснений. " + ESTIMATE_JSON_PROMPT}]
-            result = await claude_service.complete_json(system, retry_msg, model=model)
+            result = await claude_service.complete_json(system, retry_msg, max_tokens=MAX_TOKENS_SMETA, model=model)
 
         raw_items = result.get("items", result) if isinstance(result, dict) else result
+        if not isinstance(raw_items, list):
+            raise ValueError(f"Claude вернул неожиданный формат сметы: {type(raw_items)}")
+
+        # Validate: drop positions without name or with zero totals after enrichment
+        valid_items = [r for r in raw_items if isinstance(r, dict) and r.get("name", "").strip()]
+        if not valid_items:
+            raise ValueError("Claude не вернул ни одной позиции в смете — проверь входные файлы")
 
         task.progress_message = "Обогащение ценами..."
         await db.commit()
@@ -207,9 +191,10 @@ class TaskProcessor:
         for item in existing:
             await db.delete(item)
 
+        saved_count = 0
         # Save new items with prices from price service
-        for i, raw in enumerate(raw_items):
-            name = raw.get("name", "")
+        for i, raw in enumerate(valid_items):
+            name = raw.get("name", "").strip()
             item_type = raw.get("type", "Работа")
             work_price = float(raw.get("work_price", 0) or 0)
             mat_price = float(raw.get("mat_price", 0) or 0)
@@ -226,6 +211,9 @@ class TaskProcessor:
                     mat_price = cached
 
             total = (work_price + mat_price) * quantity
+            # Skip positions where both prices are zero after enrichment — likely garbage rows
+            if total == 0 and item_type in ("Работа", "Материал"):
+                continue
             source_url = raw.get("source_url") or None
             comment = raw.get("comment") or None
             db.add(EstimateItem(
@@ -243,6 +231,10 @@ class TaskProcessor:
                 source_url=source_url,
                 comment=comment,
             ))
+            saved_count += 1
+
+        if saved_count == 0:
+            raise ValueError("Все позиции сметы имеют нулевую стоимость — проверь входные файлы")
 
         await db.flush()
 

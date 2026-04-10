@@ -21,11 +21,15 @@ HAIKU = "claude-haiku-4-5-20251001"
 # Default for callers that don't specify a model
 MODEL = OPUS
 MAX_TOKENS = 16000
+MAX_TOKENS_SMETA = 32000  # Estimates can be large — use higher limit
 
 
 async def complete(system: str, messages: list[dict], max_tokens: int = MAX_TOKENS, model: str = MODEL) -> str:
     import asyncio
-    from anthropic import APIStatusError
+    from anthropic import APIStatusError, APIConnectionError, APITimeoutError
+
+    _RETRYABLE_STATUS = {429, 500, 502, 503, 529}
+
     for attempt in range(5):
         try:
             response = await client.messages.create(
@@ -33,7 +37,12 @@ async def complete(system: str, messages: list[dict], max_tokens: int = MAX_TOKE
             )
             return response.content[0].text
         except APIStatusError as e:
-            if e.status_code == 529 and attempt < 4:
+            if e.status_code in _RETRYABLE_STATUS and attempt < 4:
+                await asyncio.sleep(2 ** attempt)
+                continue
+            raise
+        except (APIConnectionError, APITimeoutError):
+            if attempt < 4:
                 await asyncio.sleep(2 ** attempt)
                 continue
             raise
