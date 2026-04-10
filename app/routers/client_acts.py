@@ -13,6 +13,7 @@ from app.database import get_db
 from app.models.project import Project
 from app.models.client_act import ClientKs2Act, ClientKs2ActItem
 from app.models.estimate_item import EstimateItem
+from app.models.purchase_request import PurchaseRequest, PurchaseRequestItem
 from app.models.task import Task
 from app.models.contractor import Contractor
 
@@ -525,23 +526,28 @@ async def actioning_summary(
     project_id: str,
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
+    task_id: Optional[str] = None,
 ):
     await _get_project_owned(project_id, current_user.id, db)
 
-    # Get only CLIENT (non-subcontractor) tasks for this project
-    tasks_result = await db.execute(
-        select(Task).where(Task.project_id == project_id)
-    )
-    client_tasks = [
-        t for t in tasks_result.scalars().all()
-        if getattr(t, "estimate_type", None) != "subcontractor"
-    ]
-    task_ids = [t.id for t in client_tasks]
+    if task_id:
+        # Filter by specific task
+        task_ids = [task_id]
+    else:
+        # Get only CLIENT (non-subcontractor) tasks for this project
+        tasks_result = await db.execute(
+            select(Task).where(Task.project_id == project_id)
+        )
+        client_tasks = [
+            t for t in tasks_result.scalars().all()
+            if getattr(t, "estimate_type", None) != "subcontractor"
+        ]
+        task_ids = [t.id for t in client_tasks]
 
     if not task_ids:
         return []
 
-    # Get all non-header estimate items for this project
+    # Get all non-header estimate items for this project/task
     items_result = await db.execute(
         select(EstimateItem).where(
             and_(
@@ -552,7 +558,7 @@ async def actioning_summary(
     )
     estimate_items = items_result.scalars().all()
 
-    # Get all actioned quantities from non-cancelled acts
+    # Get all actioned quantities from non-cancelled KS-2 acts
     actioned_result = await db.execute(
         select(
             ClientKs2ActItem.estimate_item_id,
@@ -570,6 +576,27 @@ async def actioning_summary(
         row.estimate_item_id: float(row.total_actioned)
         for row in actioned_result.fetchall()
     }
+
+    # Also add quantities from confirmed purchase requests (material is considered used)
+    purchase_result = await db.execute(
+        select(
+            PurchaseRequestItem.estimate_item_id,
+            func.sum(PurchaseRequestItem.quantity_requested).label("total_purchased"),
+        ).select_from(PurchaseRequestItem).join(
+            PurchaseRequest, PurchaseRequest.id == PurchaseRequestItem.request_id
+        ).where(
+            and_(
+                PurchaseRequest.project_id == project_id,
+                PurchaseRequest.status == "confirmed",
+                PurchaseRequestItem.estimate_item_id.isnot(None),
+            )
+        ).group_by(PurchaseRequestItem.estimate_item_id)
+    )
+    for row in purchase_result.fetchall():
+        if row.estimate_item_id:
+            actioned_map[row.estimate_item_id] = (
+                actioned_map.get(row.estimate_item_id, 0.0) + float(row.total_purchased)
+            )
 
     summary = []
     for ei in estimate_items:

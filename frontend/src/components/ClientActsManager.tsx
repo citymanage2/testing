@@ -74,10 +74,13 @@ function statusBadge(s: string) {
 function fmt(d: string) { return d ? new Date(d).toLocaleDateString('ru-RU') : '—' }
 function pct(a: number, b: number) { return b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0 }
 
+interface EstimateOption { id: string; name?: string; estimate_type?: string; }
+
 export default function ClientActsManager({ projectId }: { projectId: string }) {
   const [tab, setTab] = useState<'acts' | 'summary'>('acts');
   const [acts, setActs] = useState<Act[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [estimates, setEstimates] = useState<EstimateOption[]>([]);
   const [summary, setSummary] = useState<SummaryItem[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [itemsMap, setItemsMap] = useState<Record<string, ActItem[]>>({});
@@ -85,11 +88,11 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
 
   // new act modal
   const [actModal, setActModal] = useState(false);
-  const [actForm, setActForm] = useState({ act_number: '', act_type: 'client', contractor_id: '', period_start: '', period_end: '' });
+  const [actForm, setActForm] = useState({ act_number: '', act_type: 'client', task_id: '', contractor_id: '', period_start: '', period_end: '' });
   const [savingAct, setSavingAct] = useState(false);
 
   // items editor modal
-  const [itemsModal, setItemsModal] = useState<Act | null>(null);
+  const [itemsModal, setItemsModal] = useState<Act & { task_id?: string } | null>(null);
   const [editItems, setEditItems] = useState<ActItem[]>([]);
   const [savingItems, setSavingItems] = useState(false);
 
@@ -98,9 +101,11 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
     Promise.all([
       client.get(`/projects/${projectId}/client-acts`),
       client.get('/contractors'),
-    ]).then(([actsR, contrR]) => {
+      client.get(`/projects/${projectId}`),
+    ]).then(([actsR, contrR, projR]) => {
       setActs(actsR.data);
       setContractors(contrR.data);
+      setEstimates((projR.data.tasks || []) as EstimateOption[]);
     }).finally(() => setLoading(false));
   }, [projectId]);
 
@@ -144,8 +149,9 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
     load();
   };
 
-  const openItemsEditor = async (act: Act) => {
-    const r = await client.get(`/projects/${projectId}/actioning-summary`);
+  const openItemsEditor = async (act: Act & { task_id?: string }) => {
+    const params = act.task_id ? `?task_id=${act.task_id}` : '';
+    const r = await client.get(`/projects/${projectId}/actioning-summary${params}`);
     const summaryItems: SummaryItem[] = r.data;
     const existing: ActItem[] = itemsMap[act.id] ?? [];
     const items: ActItem[] = summaryItems.map(si => {
@@ -367,9 +373,20 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
               </label>
               <label style={LBL}>
                 Тип акта
-                <select style={INPUT} value={actForm.act_type} onChange={e => setActForm(f => ({ ...f, act_type: e.target.value }))}>
+                <select style={INPUT} value={actForm.act_type} onChange={e => setActForm(f => ({ ...f, act_type: e.target.value, task_id: '' }))}>
                   <option value="client">С заказчиком</option>
                   <option value="subcontractor">С подрядчиком</option>
+                </select>
+              </label>
+              <label style={LBL}>
+                На основании сметы
+                <select style={INPUT} value={actForm.task_id} onChange={ev => setActForm(f => ({ ...f, task_id: ev.target.value }))}>
+                  <option value="">— не указана —</option>
+                  {estimates
+                    .filter(est => actForm.act_type === 'subcontractor'
+                      ? est.estimate_type === 'subcontractor'
+                      : est.estimate_type !== 'subcontractor')
+                    .map(est => <option key={est.id} value={est.id}>{est.name || est.id.slice(0, 8)}</option>)}
                 </select>
               </label>
               <label style={LBL}>

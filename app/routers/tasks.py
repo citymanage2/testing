@@ -92,6 +92,8 @@ async def create_manual_task(
         project_id=body.get("project_id"),
         estimate_status="draft",
         estimate_type=body.get("estimate_type") or "main",
+        parent_estimate_id=body.get("parent_estimate_id"),
+        calculation_method=body.get("calculation_method"),
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
@@ -119,6 +121,8 @@ async def get_status(
         error_message=task.error_message,
         estimate_status=task.estimate_status,
         estimate_type=getattr(task, 'estimate_type', None),
+        project_id=getattr(task, 'project_id', None),
+        calculation_method=getattr(task, 'calculation_method', None),
         created_at=task.created_at,
         updated_at=task.updated_at,
     )
@@ -235,6 +239,7 @@ async def copy_task_as_subcontractor(
         project_id=source_task.project_id,
         estimate_status="draft",
         estimate_type="subcontractor",
+        parent_estimate_id=body.get("parent_estimate_id") or None,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )

@@ -44,6 +44,8 @@ class Task(Base):
     estimate_status_updated_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     extras: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     estimate_type: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, default="main")
+    parent_estimate_id: Mapped[Optional[str]] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
+    calculation_method: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)  # 'manual' | 'ai'
     is_approved: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

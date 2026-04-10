@@ -30,6 +30,8 @@ class WorkScheduleItem(Base):
     unit: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     total_quantity: Mapped[float] = mapped_column(Float(), nullable=False, default=0.0)
     sort_order: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
+    plan_start: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)   # YYYY-MM-DD
+    plan_end: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)     # YYYY-MM-DD
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,

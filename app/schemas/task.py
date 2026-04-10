@@ -12,6 +12,8 @@ class TaskStatusResponse(BaseModel):
     error_message: str | None
     estimate_status: str | None
     estimate_type: str | None = None
+    project_id: str | None = None
+    calculation_method: str | None = None
     created_at: datetime
     updated_at: datetime
 

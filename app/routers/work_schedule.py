@@ -44,6 +44,8 @@ class ScheduleItemCreate(BaseModel):
     unit: Optional[str] = None
     total_quantity: float
     sort_order: Optional[float] = None
+    plan_start: Optional[str] = None
+    plan_end: Optional[str] = None
 
 
 class ScheduleItemPatch(BaseModel):
@@ -51,6 +53,8 @@ class ScheduleItemPatch(BaseModel):
     unit: Optional[str] = None
     total_quantity: Optional[float] = None
     sort_order: Optional[float] = None
+    plan_start: Optional[str] = None
+    plan_end: Optional[str] = None
 
 
 class ScheduleItemResponse(BaseModel):
@@ -61,6 +65,8 @@ class ScheduleItemResponse(BaseModel):
     unit: Optional[str]
     total_quantity: float
     sort_order: float
+    plan_start: Optional[str] = None
+    plan_end: Optional[str] = None
     entries: list[ScheduleEntryResponse]
 
     model_config = {"from_attributes": True}
@@ -110,6 +116,8 @@ async def _load_item_with_entries(item: WorkScheduleItem, db: AsyncSession) -> S
         unit=getattr(item, "unit", None),
         total_quantity=item.total_quantity,
         sort_order=getattr(item, "sort_order", 0.0),
+        plan_start=getattr(item, "plan_start", None),
+        plan_end=getattr(item, "plan_end", None),
         entries=[
             ScheduleEntryResponse(
                 id=e.id,
@@ -172,6 +180,8 @@ async def create_schedule_item(
         unit=body.unit,
         total_quantity=body.total_quantity,
         sort_order=sort_order,
+        plan_start=body.plan_start,
+        plan_end=body.plan_end,
     )
     db.add(item)
     await db.commit()

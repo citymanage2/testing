@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import client from '../api/client';
 import StatusBadge from '../components/StatusBadge';
 import VersionHistoryDrawer from '../components/VersionHistoryDrawer';
@@ -72,6 +72,8 @@ export default function EstimateView() {
   const [catalogQuery, setCatalogQuery] = useState('');
   const [catalogResults, setCatalogResults] = useState<{id: string; name: string; unit?: string; work_price: number; mat_price: number; item_type: string}[]>([]);
   const [estimateType, setEstimateType] = useState<string | null>(null);
+  const [calculationMethod, setCalculationMethod] = useState<string | null>(null);
+  const [projectInfo, setProjectInfo] = useState<{ id: string; name: string } | null>(null);
   const [showSepSheet, setShowSepSheet] = useState(false);
   const [sepSections, setSepSections] = useState<Record<string, boolean>>({});
   const [sepManual, setSepManual] = useState(false);
@@ -111,20 +113,13 @@ export default function EstimateView() {
       setDocType(statusR.data.doc_type || '');
       setEstimateStatus(statusR.data.estimate_status || '');
       setEstimateType((statusR.data as any).estimate_type || null);
+      setCalculationMethod((statusR.data as any).calculation_method || null);
       setExtras(extrasR.data);
-      // Load project stage for lock check
-      if ((statusR.data as any).project_id) {
-        client.get(`/projects/${(statusR.data as any).project_id}/stage`).then(r => {
-          setProjectStage(r.data.stage || '');
-        }).catch(() => {});
-      } else {
-        client.get<{ project_id?: string }>(`/tasks/${id}`).then(taskR => {
-          if (taskR.data.project_id) {
-            client.get(`/projects/${taskR.data.project_id}/stage`).then(r => {
-              setProjectStage(r.data.stage || '');
-            }).catch(() => {});
-          }
-        }).catch(() => {});
+      // Load project stage for lock check and project name for breadcrumb
+      const pid = (statusR.data as any).project_id;
+      if (pid) {
+        client.get(`/projects/${pid}/stage`).then(r => setProjectStage(r.data.stage || '')).catch(() => {});
+        client.get<{ id: string; name: string }>(`/projects/${pid}/card`).then(r => setProjectInfo({ id: r.data.id, name: r.data.name })).catch(() => {});
       }
     }
     catch { setError('Ошибка загрузки'); }
@@ -252,6 +247,11 @@ export default function EstimateView() {
   async function saveDocType(val: string) {
     setDocType(val);
     await client.patch(`/tasks/${id}/doc-type`, { doc_type: val });
+  }
+
+  async function saveCalculationMethod(val: string | null) {
+    setCalculationMethod(val);
+    await client.patch(`/projects/estimates/${id}/meta`, { calculation_method: val }).catch(() => {});
   }
 
   async function deleteTask() {
@@ -452,6 +452,22 @@ export default function EstimateView() {
     <div style={fullscreen ? { position: 'fixed', inset: 0, zIndex: 200, overflowY: 'auto', background: C.surfaceAlt, padding: '16px 20px' } : { padding: '0 0 16px 0' }}>
       {/* ── Page header ───────────────────────────────────────────────── */}
       <div style={{ ...CARD, marginBottom: 16, padding: '16px 20px' }}>
+        {/* Breadcrumb */}
+        {projectInfo && (
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+            <Link to="/task/create" style={{ color: C.textMuted, textDecoration: 'none' }}>Проекты</Link>
+            <span>›</span>
+            <Link to={`/projects/${projectInfo.id}`} style={{ color: C.primary, textDecoration: 'none', fontWeight: 500 }}>{projectInfo.name}</Link>
+            <span>›</span>
+            <span style={{ color: C.text }}>{taskName || `Смета ${id?.slice(0, 8)}`}</span>
+            {estimateType === 'subcontractor' && (
+              <span style={{ marginLeft: 4, fontSize: 11, padding: '1px 7px', borderRadius: 10, background: C.warningBg, color: C.warning, fontWeight: 600 }}>подрядчик</span>
+            )}
+            {estimateType !== 'subcontractor' && (
+              <span style={{ marginLeft: 4, fontSize: 11, padding: '1px 7px', borderRadius: 10, background: C.primaryBg, color: C.primary, fontWeight: 600 }}>заказчик</span>
+            )}
+          </div>
+        )}
         {/* Title row */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 200 }}>
@@ -486,6 +502,21 @@ export default function EstimateView() {
                 <option value="">— тип документа —</option>
                 {DOC_TYPES.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
+              {/* Calculation method badge */}
+              <div style={{ display: 'flex', gap: 3, border: `1px solid ${C.border}`, borderRadius: 6, overflow: 'hidden' }}>
+                {[
+                  { val: null, label: '—' },
+                  { val: 'manual', label: 'Вручную' },
+                  { val: 'ai', label: 'ИИ' },
+                ].map(({ val, label }) => (
+                  <button key={String(val)} onClick={() => saveCalculationMethod(val)}
+                    style={{ padding: '3px 8px', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: calculationMethod === val ? 700 : 400,
+                      background: calculationMethod === val ? (val === 'ai' ? '#7c3aed22' : val === 'manual' ? C.surfaceAlt : C.surface) : 'transparent',
+                      color: calculationMethod === val ? (val === 'ai' ? '#7c3aed' : C.text) : C.textMuted }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

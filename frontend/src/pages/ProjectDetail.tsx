@@ -25,7 +25,8 @@ interface GalleryMeta { id: number; file_name: string; mime_type: string; captio
 interface Payment { id: string; direction: string; amount: number; paid_at: string; description?: string; contractor_id?: string; contractor_name?: string; created_at: string; }
 interface FinSummary { budget_planned?: number; estimate_total: number; client_total: number; subcontractor_total: number; profit: number; income_received: number; expenses_paid: number; balance: number; budget_remaining?: number; }
 interface Contractor { id: string; kind: string; name: string; }
-interface TaskInProject { id: string; task_type: string; status: string; estimate_status?: string; estimate_type?: string; name?: string; created_at: string; }
+interface TaskInProject { id: string; task_type: string; status: string; estimate_status?: string; estimate_type?: string; parent_estimate_id?: string; calculation_method?: string; name?: string; created_at: string; }
+interface EstimateWithTotal { id: string; name?: string; estimate_type?: string; parent_estimate_id?: string; calculation_method?: string; estimate_status?: string; created_at: string; total: number; }
 interface StageInfo { stage: string; stage_label: string; allowed_next_stages: string[]; }
 
 const STAGE_ORDER = ['LEAD','ESTIMATION','OPTIMIZATION','APPROVAL','EXECUTION','HANDOVER','WARRANTY','CLOSED'];
@@ -42,7 +43,7 @@ const STAGE_COLORS: Record<string, string> = {
   WARRANTY: '#b45309', CLOSED: C.textMuted,
 };
 const CONSTRUCTION_TYPES = ['Новое строительство', 'Реконструкция', 'Ремонт', 'Прочее'];
-type TabType = 'info' | 'docs' | 'contracts' | 'schedule' | 'acts' | 'purchases' | 'gallery' | 'finance' | 'estimates' | 'warranty' | 'kp';
+type TabType = 'info' | 'docs' | 'schedule' | 'acts' | 'purchases' | 'gallery' | 'finance' | 'estimates' | 'warranty';
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -73,6 +74,11 @@ export default function ProjectDetail() {
   const [subSourceItems, setSubSourceItems] = useState<{id: string; name: string; type: string; section: string; unit: string; quantity: number}[]>([]);
   const [subSelectedIds, setSubSelectedIds] = useState<Set<string>>(new Set());
   const [loadingSubItems, setLoadingSubItems] = useState(false);
+  const [estimatesWithTotals, setEstimatesWithTotals] = useState<EstimateWithTotal[]>([]);
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [savingNewClient, setSavingNewClient] = useState(false);
+  const [subParentId, setSubParentId] = useState('');
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   async function loadAll() {
@@ -90,6 +96,8 @@ export default function ProjectDetail() {
       setGallery(galleryR.data); setPayments(paymentsR.data);
       setFinSummary(finR.data); setContractors(contractorsR.data);
       setTasks(detailR.data.tasks || []);
+      // Load estimates with totals
+      client.get<EstimateWithTotal[]>(`/projects/${id}/estimates-with-totals`).then(r => setEstimatesWithTotals(r.data)).catch(() => {});
       // Load stage info
       try {
         const stageR = await client.get<StageInfo>(`/projects/${id}/stage`);
@@ -163,14 +171,18 @@ export default function ProjectDetail() {
   const stageIdx = STAGE_ORDER.indexOf(currentStage);
   const atLeast = (s: string) => stageIdx < 0 || stageIdx >= STAGE_ORDER.indexOf(s);
 
+  const clientEstimates = estimatesWithTotals.filter(t => t.estimate_type !== 'subcontractor');
+  const subEstimates = estimatesWithTotals.filter(t => t.estimate_type === 'subcontractor');
+  const clientTotal = clientEstimates.reduce((s, t) => s + t.total, 0);
+  const subTotal = subEstimates.reduce((s, t) => s + t.total, 0);
+  const saldo = clientTotal - subTotal;
+
   const ALL_TABS: [TabType, string][] = [
     ['info',      '📋 Информация'],
     ['docs',      '📁 Документы'],
     ['estimates', `📐 Сметы (${tasks.length})`],
     ['finance',   '💰 Финансы'],
-    ['kp',        '📊 Оптимизация КП'],
     ...(atLeast('ESTIMATION') ? [['schedule', '📅 ГПР'] as [TabType, string]] : []),
-    ...(atLeast('APPROVAL')   ? [['contracts', '📄 Договоры'] as [TabType, string]] : []),
     ...(atLeast('EXECUTION')  ? [
       ['acts',      '✅ КС-2'],
       ['purchases', '🛒 Закупки'],
@@ -220,10 +232,28 @@ export default function ProjectDetail() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
               <label style={LBL}>Адрес<input value={form.address || ''} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} style={{ ...INPUT, marginTop: 4 }} /></label>
               <label style={LBL}>Заказчик
-                <select value={form.client_id || ''} onChange={e => setForm(f => ({ ...f, client_id: e.target.value || undefined }))} style={{ ...INPUT, marginTop: 4 }}>
-                  <option value="">— не указан —</option>
-                  {clientContractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  <select value={form.client_id || ''} onChange={e => setForm(f => ({ ...f, client_id: e.target.value || undefined }))} style={{ ...INPUT, flex: 1 }}>
+                    <option value="">— не указан —</option>
+                    {clientContractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <button type="button" style={btnGhost('sm')} title="Создать нового заказчика" onClick={() => setShowNewClientForm(v => !v)}>+</button>
+                </div>
+                {showNewClientForm && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    <input value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder="Название заказчика" style={{ ...INPUT, flex: 1 }} />
+                    <button type="button" disabled={savingNewClient || !newClientName.trim()} style={btnPrimary('sm')} onClick={async () => {
+                      setSavingNewClient(true);
+                      try {
+                        const r = await client.post('/contractors', { kind: 'client', name: newClientName.trim() });
+                        setContractors(prev => [...prev, r.data]);
+                        setForm(f => ({ ...f, client_id: r.data.id }));
+                        setNewClientName(''); setShowNewClientForm(false);
+                      } finally { setSavingNewClient(false); }
+                    }}>{savingNewClient ? '...' : 'Создать'}</button>
+                    <button type="button" style={btnGhost('sm')} onClick={() => { setShowNewClientForm(false); setNewClientName(''); }}>✕</button>
+                  </div>
+                )}
               </label>
               <label style={LBL}>Тип строительства
                 <select value={form.construction_type || ''} onChange={e => setForm(f => ({ ...f, construction_type: e.target.value || undefined }))} style={{ ...INPUT, marginTop: 4 }}>
@@ -363,13 +393,19 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      {tab === 'docs' && id && <ProjectDocuments projectId={id} />}
-      {tab === 'contracts' && id && <SubcontractorContracts projectId={id} />}
+      {tab === 'docs' && id && (
+        <div>
+          <ProjectDocuments projectId={id} />
+          <div style={{ marginTop: 24, borderTop: `2px solid ${C.border}`, paddingTop: 20 }}>
+            <h3 style={{ margin: '0 0 14px', fontSize: 15, color: C.text }}>Договоры</h3>
+            <SubcontractorContracts projectId={id} />
+          </div>
+        </div>
+      )}
       {tab === 'schedule' && id && <WorkSchedule projectId={id} />}
       {tab === 'acts' && id && <ClientActsManager projectId={id} />}
       {tab === 'purchases' && id && <PurchaseRequests projectId={id} />}
       {tab === 'warranty' && <WarrantyClaims projectId={id!} />}
-      {tab === 'kp' && <KpRequests projectId={id!} />}
 
       {tab === 'gallery' && (
         <div>
@@ -466,8 +502,24 @@ export default function ProjectDetail() {
 
       {tab === 'estimates' && (
         <div>
-          {/* Client estimates */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          {/* Totals summary */}
+          {estimatesWithTotals.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 20 }}>
+              {[
+                ['Заказчик', clientTotal, C.primary],
+                ['Подрядчик', subTotal, C.warning],
+                ['Сальдо', saldo, saldo >= 0 ? C.success : C.danger],
+              ].map(([label, val, color]) => (
+                <div key={label as string} style={{ ...CARD, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 11, color: C.textMuted }}>{label as string}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: color as string, marginTop: 4 }}>{fmt(val as number)} ₽</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Client estimates with their sub-estimates */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <h4 style={{ margin: 0, fontSize: 14, color: C.text, fontWeight: 600 }}>Сметы с заказчиком</h4>
             <button style={btnPrimary('sm')} onClick={async () => {
               const n = prompt('Название новой сметы:');
@@ -476,56 +528,124 @@ export default function ProjectDetail() {
               window.location.href = `/task/${r.data.task_id}/estimate`;
             }}>+ Новая смета</button>
           </div>
-          {tasks.filter(t => t.estimate_type !== 'subcontractor').length === 0
-            ? <div style={{ ...CARD, padding: 20, textAlign: 'center', color: C.textMuted, marginBottom: 16 }}>Нет смет с заказчиком</div>
-            : tasks.filter(t => t.estimate_type !== 'subcontractor').map(t => (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <Link to={`/task/${t.id}/estimate`} style={{ flex: 1, display: 'block', padding: '10px 14px', border: `1px solid ${C.border}`, borderRadius: 8, textDecoration: 'none', color: 'inherit', background: C.surfaceAlt }}>
-                  <div style={{ fontWeight: 500, color: C.text }}>{t.name || `Смета ${t.id.slice(0, 8)}`}</div>
-                  <div style={{ fontSize: 12, color: C.textSec, marginTop: 2 }}>Статус: {t.estimate_status || 'не указан'} · {new Date(t.created_at).toLocaleDateString('ru-RU')}</div>
-                </Link>
-                <button
-                  onClick={async () => {
-                    if (!confirm('Удалить смету?')) return;
-                    try { await client.delete(`/tasks/${t.id}`); setTasks(prev => prev.filter(x => x.id !== t.id)); }
-                    catch { alert('Ошибка удаления'); }
-                  }}
-                  style={{ padding: '6px 10px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
-                  title="Удалить смету"
-                >✕</button>
-              </div>
-            ))}
 
-          {/* Subcontractor estimates */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 8 }}>
-            <h4 style={{ margin: 0, fontSize: 14, color: C.text, fontWeight: 600 }}>Сметы с субподрядчиком</h4>
-            <button style={btnOutline('sm')} onClick={() => {
-              setSubModalForm({ sourceTaskId: '', name: '' });
-              setShowSubModal(true);
-            }}>+ Субподрядная</button>
-          </div>
-          {tasks.filter(t => t.estimate_type === 'subcontractor').length === 0
-            ? <div style={{ ...CARD, padding: 20, textAlign: 'center', color: C.textMuted }}>Нет смет с субподрядчиком</div>
-            : tasks.filter(t => t.estimate_type === 'subcontractor').map(t => (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <Link to={`/task/${t.id}/estimate`} style={{ flex: 1, display: 'block', padding: '10px 14px', border: `1px solid ${C.border}`, borderRadius: 8, textDecoration: 'none', color: 'inherit', background: C.surfaceAlt }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontWeight: 500, color: C.text }}>{t.name || `Смета ${t.id.slice(0, 8)}`}</span>
-                    <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: C.warningBg, color: C.warning, fontWeight: 600 }}>субподряд</span>
+          {clientEstimates.length === 0
+            ? <div style={{ ...CARD, padding: 20, textAlign: 'center', color: C.textMuted, marginBottom: 16 }}>Нет смет с заказчиком</div>
+            : clientEstimates.map(t => {
+              const linkedSubs = subEstimates.filter(s => s.parent_estimate_id === t.id);
+              return (
+                <div key={t.id} style={{ marginBottom: 12 }}>
+                  {/* Client estimate row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Link to={`/task/${t.id}/estimate`} style={{ flex: 1, display: 'block', padding: '10px 14px', border: `1px solid ${C.primary}44`, borderRadius: 8, textDecoration: 'none', color: 'inherit', background: C.primaryBg }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, color: C.text }}>{t.name || `Смета ${t.id.slice(0, 8)}`}</span>
+                        <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: C.primary + '22', color: C.primary, fontWeight: 600 }}>заказчик</span>
+                        {t.calculation_method === 'ai' && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#7c3aed22', color: '#7c3aed', fontWeight: 600 }}>ИИ</span>}
+                        {t.calculation_method === 'manual' && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: C.surfaceAlt, color: C.textSec, fontWeight: 600 }}>Вручную</span>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 12, fontSize: 12, color: C.textSec, marginTop: 4, flexWrap: 'wrap' }}>
+                        <span>Статус: {t.estimate_status || 'не указан'}</span>
+                        <span>{new Date(t.created_at).toLocaleDateString('ru-RU')}</span>
+                        {t.total > 0 && <span style={{ fontWeight: 700, color: C.primary }}>{fmt(t.total)} ₽</span>}
+                      </div>
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setSubParentId(t.id);
+                        setSubModalForm({ sourceTaskId: '', name: '' });
+                        setShowSubModal(true);
+                      }}
+                      style={{ ...btnOutline('sm'), flexShrink: 0, whiteSpace: 'nowrap' }}
+                      title="Создать смету с подрядчиком для этой сметы"
+                    >+ Подрядчик</button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Удалить смету?')) return;
+                        try { await client.delete(`/tasks/${t.id}`); loadAll(); }
+                        catch { alert('Ошибка удаления'); }
+                      }}
+                      style={{ padding: '6px 10px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
+                    >✕</button>
                   </div>
-                  <div style={{ fontSize: 12, color: C.textSec, marginTop: 2 }}>Статус: {t.estimate_status || 'не указан'} · {new Date(t.created_at).toLocaleDateString('ru-RU')}</div>
-                </Link>
-                <button
-                  onClick={async () => {
-                    if (!confirm('Удалить смету?')) return;
-                    try { await client.delete(`/tasks/${t.id}`); setTasks(prev => prev.filter(x => x.id !== t.id)); }
-                    catch { alert('Ошибка удаления'); }
-                  }}
-                  style={{ padding: '6px 10px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
-                  title="Удалить смету"
-                >✕</button>
+                  {/* Linked sub-estimates */}
+                  {linkedSubs.map(s => (
+                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, marginLeft: 28 }}>
+                      <div style={{ width: 2, height: '100%', background: C.warning, alignSelf: 'stretch', borderRadius: 2, flexShrink: 0 }} />
+                      <Link to={`/task/${s.id}/estimate`} style={{ flex: 1, display: 'block', padding: '8px 12px', border: `1px solid ${C.warning}44`, borderRadius: 8, textDecoration: 'none', color: 'inherit', background: C.warningBg }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 500, color: C.text }}>{s.name || `Смета ${s.id.slice(0, 8)}`}</span>
+                          <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: C.warning + '22', color: C.warning, fontWeight: 600 }}>подрядчик</span>
+                          {s.calculation_method === 'ai' && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#7c3aed22', color: '#7c3aed', fontWeight: 600 }}>ИИ</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 12, fontSize: 12, color: C.textSec, marginTop: 4 }}>
+                          <span>Статус: {s.estimate_status || 'не указан'}</span>
+                          <span>{new Date(s.created_at).toLocaleDateString('ru-RU')}</span>
+                          {s.total > 0 && <span style={{ fontWeight: 700, color: C.warning }}>{fmt(s.total)} ₽</span>}
+                        </div>
+                      </Link>
+                      <button
+                        onClick={async () => {
+                          if (!confirm('Удалить смету?')) return;
+                          try { await client.delete(`/tasks/${s.id}`); loadAll(); }
+                          catch { alert('Ошибка удаления'); }
+                        }}
+                        style={{ padding: '6px 10px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
+                      >✕</button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })
+          }
+
+          {/* Unlinked sub-estimates */}
+          {subEstimates.filter(s => !s.parent_estimate_id).length > 0 && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 20, marginBottom: 10 }}>
+                <h4 style={{ margin: 0, fontSize: 14, color: C.text, fontWeight: 600 }}>Сметы с подрядчиком (без привязки)</h4>
+                <button style={btnOutline('sm')} onClick={() => {
+                  setSubParentId('');
+                  setSubModalForm({ sourceTaskId: '', name: '' });
+                  setShowSubModal(true);
+                }}>+ Новая</button>
               </div>
-            ))}
+              {subEstimates.filter(s => !s.parent_estimate_id).map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Link to={`/task/${t.id}/estimate`} style={{ flex: 1, display: 'block', padding: '10px 14px', border: `1px solid ${C.warning}44`, borderRadius: 8, textDecoration: 'none', color: 'inherit', background: C.warningBg }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontWeight: 500, color: C.text }}>{t.name || `Смета ${t.id.slice(0, 8)}`}</span>
+                      <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: C.warning + '22', color: C.warning, fontWeight: 600 }}>подрядчик</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, fontSize: 12, color: C.textSec, marginTop: 4 }}>
+                      <span>Статус: {t.estimate_status || 'не указан'}</span>
+                      <span>{new Date(t.created_at).toLocaleDateString('ru-RU')}</span>
+                      {t.total > 0 && <span style={{ fontWeight: 700, color: C.warning }}>{fmt(t.total)} ₽</span>}
+                    </div>
+                  </Link>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Удалить смету?')) return;
+                      try { await client.delete(`/tasks/${t.id}`); loadAll(); }
+                      catch { alert('Ошибка удаления'); }
+                    }}
+                    style={{ padding: '6px 10px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
+                  >✕</button>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Button to add standalone sub-estimate when no client estimates */}
+          {clientEstimates.length === 0 && (
+            <div style={{ marginTop: 16 }}>
+              <button style={btnOutline('sm')} onClick={() => {
+                setSubParentId('');
+                setSubModalForm({ sourceTaskId: '', name: '' });
+                setShowSubModal(true);
+              }}>+ Смета с подрядчиком</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -551,7 +671,7 @@ export default function ProjectDetail() {
           <div style={{ ...MODAL, maxWidth: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ margin: '0 0 6px', fontSize: 16 }}>Создать смету с подрядчиком</h3>
             <p style={{ margin: '0 0 12px', fontSize: 13, color: C.textMuted }}>
-              На основании сметы заказчика (выберите позиции) или как дополнительное соглашение на новые работы.
+              {subParentId ? `Привязана к клиентской смете: ${clientEstimates.find(e => e.id === subParentId)?.name || subParentId.slice(0, 8)}` : 'На основании сметы заказчика (выберите позиции) или как дополнительное соглашение на новые работы.'}
             </p>
             <div style={{ display: 'grid', gap: 10, overflow: 'auto', flex: 1 }}>
               <label style={LBL}>Основание
@@ -642,6 +762,7 @@ export default function ProjectDetail() {
                     const r = await client.post(`/tasks/${subModalForm.sourceTaskId}/copy-as-subcontractor`, {
                       name: subModalForm.name || undefined,
                       item_ids: allSelected ? undefined : Array.from(subSelectedIds),
+                      parent_estimate_id: subParentId || subModalForm.sourceTaskId || undefined,
                     });
                     newTaskId = r.data.task_id;
                   } else {
@@ -649,6 +770,7 @@ export default function ProjectDetail() {
                       name: subModalForm.name || 'Доп. соглашение',
                       project_id: id,
                       estimate_type: 'subcontractor',
+                      parent_estimate_id: subParentId || undefined,
                     });
                     newTaskId = r.data.task_id;
                   }

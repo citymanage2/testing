@@ -15,12 +15,22 @@ class ClientKs2Act(Base):
         primary_key=True,
         default=lambda: str(uuid.uuid4()),
     )
+    # task_id — конкретная смета, к которой привязан акт
+    task_id: Mapped[Optional[str]] = mapped_column(
+        String(),
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    # project_id — дублируется из task.project_id для удобства фильтрации
     project_id: Mapped[str] = mapped_column(
         String(),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
+    # act_type: "client" (КС-2 с заказчиком) | "subcontractor" (КС-2 с подрядчиком)
+    act_type: Mapped[str] = mapped_column(String(32), nullable=False, default="client")
     act_number: Mapped[str] = mapped_column(String(64), nullable=False, default="1")
     period_start: Mapped[Optional[date]] = mapped_column(Date(), nullable=True)
     period_end: Mapped[Optional[date]] = mapped_column(Date(), nullable=True)

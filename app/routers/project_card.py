@@ -333,3 +333,44 @@ async def financial_summary(
         balance=round(income - expenses, 2),
         budget_remaining=round(budget - expenses, 2) if budget is not None else None,
     )
+
+
+# ─── Estimates with totals ──────────────────────────────────────────────────────
+
+class EstimateWithTotal(BaseModel):
+    id: str
+    name: Optional[str]
+    estimate_type: Optional[str]
+    parent_estimate_id: Optional[str]
+    calculation_method: Optional[str]
+    estimate_status: Optional[str]
+    created_at: datetime
+    total: float
+
+
+@router.get("/{project_id}/estimates-with-totals", response_model=list[EstimateWithTotal])
+async def estimates_with_totals(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    project = await db.get(Project, project_id)
+    if not project or project.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    tasks = (await db.execute(select(Task).where(Task.project_id == project_id).order_by(Task.created_at))).scalars().all()
+    result = []
+    for task in tasks:
+        items = (await db.execute(select(EstimateItem).where(EstimateItem.task_id == task.id))).scalars().all()
+        total = _calc_task_total(task, items)
+        result.append(EstimateWithTotal(
+            id=task.id,
+            name=task.name,
+            estimate_type=getattr(task, "estimate_type", None),
+            parent_estimate_id=getattr(task, "parent_estimate_id", None),
+            calculation_method=getattr(task, "calculation_method", None),
+            estimate_status=task.estimate_status,
+            created_at=task.created_at,
+            total=total,
+        ))
+    return result

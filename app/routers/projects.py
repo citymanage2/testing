@@ -74,7 +74,14 @@ async def get_project(project_id: str, current_user: CurrentUser, db: AsyncSessi
     tasks = tasks_result.scalars().all()
     return ProjectDetailResponse(
         id=project.id, name=project.name, description=project.description,
-        tasks=[TaskInProject(id=t.id, task_type=t.task_type, status=t.status, estimate_status=t.estimate_status, estimate_type=getattr(t, 'estimate_type', None), name=t.name, created_at=t.created_at) for t in tasks],
+        tasks=[TaskInProject(
+            id=t.id, task_type=t.task_type, status=t.status,
+            estimate_status=t.estimate_status,
+            estimate_type=getattr(t, 'estimate_type', None),
+            parent_estimate_id=getattr(t, 'parent_estimate_id', None),
+            calculation_method=getattr(t, 'calculation_method', None),
+            name=t.name, created_at=t.created_at,
+        ) for t in tasks],
     )
 
 
@@ -391,6 +398,28 @@ async def set_estimate_type(
     task.estimate_type = new_type
     await db.commit()
     return {"ok": True, "estimate_type": new_type}
+
+
+@router.patch("/estimates/{task_id}/meta")
+async def patch_estimate_meta(
+    task_id: str,
+    body: dict,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update parent_estimate_id and/or calculation_method for an estimate."""
+    task = await db.get(Task, task_id)
+    if not task or task.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if "parent_estimate_id" in body:
+        task.parent_estimate_id = body["parent_estimate_id"] or None
+    if "calculation_method" in body:
+        val = body["calculation_method"]
+        if val not in (None, "manual", "ai"):
+            raise HTTPException(status_code=400, detail="calculation_method must be 'manual' or 'ai'")
+        task.calculation_method = val
+    await db.commit()
+    return {"ok": True}
 
 
 @router.post("/{project_id}/import-estimate")
