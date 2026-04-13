@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
+import TooltipProvider from './components/TooltipProvider';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import TaskCreate from './pages/TaskCreate';
@@ -16,6 +17,7 @@ import Ks2Preview from './pages/Ks2Preview';
 export default function App() {
   return (
     <BrowserRouter>
+      <TooltipProvider />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute />}>

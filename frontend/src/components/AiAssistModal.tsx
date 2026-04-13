@@ -98,7 +98,7 @@ export default function AiAssistModal({ taskId, onClose }: Props) {
               color: C.textMuted,
             }}
             onClick={onClose}
-            title="Закрыть"
+            data-tooltip="Закрыть ИИ-помощник"
           >
             ✕
           </button>
@@ -167,6 +167,7 @@ export default function AiAssistModal({ taskId, onClose }: Props) {
             }}
             disabled={loading || !prompt.trim()}
             onClick={handleSubmit}
+            data-tooltip="Отправить запрос ИИ-помощнику для анализа или доработки сметы (Ctrl+Enter)"
           >
             {loading ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>

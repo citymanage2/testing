@@ -36,13 +36,13 @@ export default function AnaloguePanel({ taskId, itemId, isAnalogue, onClose, onA
     <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, background: '#fff', boxShadow: '-4px 0 16px rgba(0,0,0,0.15)', zIndex: 1200, display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '14px 20px', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ margin: 0 }}>Аналоги</h3>
-        <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer' }}>×</button>
+        <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer' }} data-tooltip="Закрыть панель аналогов без применения">×</button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         {isAnalogue && (
           <div style={{ padding: '10px 14px', background: '#fff3e0', border: '1px solid #ffcc02', borderRadius: 6, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 14, color: '#e65100' }}>Используется аналог</span>
-            <button onClick={revert} disabled={reverting} style={{ padding: '5px 12px', background: '#ff9800', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}>
+            <button onClick={revert} disabled={reverting} style={{ padding: '5px 12px', background: '#ff9800', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }} data-tooltip="Вернуть исходную цену позиции — отменить применение аналога">
               {reverting ? 'Отмена...' : 'Отменить'}
             </button>
           </div>
@@ -61,7 +61,7 @@ export default function AnaloguePanel({ taskId, itemId, isAnalogue, onClose, onA
             {a.diff && <div style={{ fontSize: 12, color: '#666', fontStyle: 'italic', marginBottom: 6 }}>{a.diff}</div>}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {a.source_url && <a href={a.source_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#1565c0' }}>🔗 {a.source_url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]} ↗</a>}
-              <button onClick={() => apply(a)} disabled={applying === a.id} style={{ marginLeft: 'auto', padding: '5px 14px', background: applying === a.id ? '#bdbdbd' : '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}>
+              <button onClick={() => apply(a)} disabled={applying === a.id} style={{ marginLeft: 'auto', padding: '5px 14px', background: applying === a.id ? '#bdbdbd' : '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }} data-tooltip="Применить цену этого аналога к позиции сметы">
                 {applying === a.id ? '...' : 'Применить'}
               </button>
             </div>

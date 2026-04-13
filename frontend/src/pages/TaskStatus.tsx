@@ -89,10 +89,10 @@ export default function TaskStatus() {
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {task.status === 'completed' && task.estimate_status !== null && (
-          <button onClick={() => navigate(`/task/${id}/estimate`)} style={btn('#4caf50')}>Открыть смету</button>
+          <button onClick={() => navigate(`/task/${id}/estimate`)} style={btn('#4caf50')} data-tooltip="Перейти к просмотру и редактированию готовой сметы">Открыть смету</button>
         )}
         {isActive && (
-          <button onClick={async () => { setCancelling(true); try { await client.post(`/tasks/${id}/cancel`); } catch { /**/ } finally { setCancelling(false); } }} disabled={cancelling} style={btn('#f44336')}>
+          <button onClick={async () => { setCancelling(true); try { await client.post(`/tasks/${id}/cancel`); } catch { /**/ } finally { setCancelling(false); } }} disabled={cancelling} style={btn('#f44336')} data-tooltip="Отменить выполнение текущей задачи ИИ">
             {cancelling ? 'Отмена...' : 'Отменить'}
           </button>
         )}
@@ -123,14 +123,14 @@ export default function TaskStatus() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage()} placeholder="Уточните смету..." disabled={sending} style={{ flex: 1, padding: '8px 12px', fontSize: 14, borderRadius: 4, border: '1px solid #ccc' }} />
-          <button onClick={sendMessage} disabled={sending || !chatInput.trim()} style={btn('#1565c0')}>{sending ? '...' : 'Отправить'}</button>
+          <button onClick={sendMessage} disabled={sending || !chatInput.trim()} style={btn('#1565c0')} data-tooltip="Отправить сообщение ИИ для уточнения или доработки результата (нажмите Enter)">{sending ? '...' : 'Отправить'}</button>
         </div>
       </div>
 
       <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #e0e0e0', display: 'flex', gap: 8, alignItems: 'center' }}>
         <span style={{ fontSize: 13, color: '#888' }}>Логи:</span>
-        <button onClick={downloadLog} style={btn('#546e7a')}>Скачать .txt</button>
-        <button onClick={copyLog} style={btn(copied ? '#4caf50' : '#78909c')}>{copied ? 'Скопировано!' : 'Копировать'}</button>
+        <button onClick={downloadLog} style={btn('#546e7a')} data-tooltip="Скачать лог выполнения задачи в текстовый файл (.txt)">Скачать .txt</button>
+        <button onClick={copyLog} style={btn(copied ? '#4caf50' : '#78909c')} data-tooltip="Скопировать лог выполнения задачи в буфер обмена">{copied ? 'Скопировано!' : 'Копировать'}</button>
       </div>
     </div>
   );

@@ -195,8 +195,8 @@ export default function KpRequests({ projectId }: { projectId: string }) {
               </td>
               <td style={TD}>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button style={btnOutline('sm')} onClick={() => openEdit(req)}>✎</button>
-                  <button style={btnDanger('sm')} onClick={() => deleteRequest(req.id)}>✕</button>
+                  <button style={btnOutline('sm')} onClick={() => openEdit(req)} data-tooltip="Редактировать заявку на материал: количество, цену, поставщика">✎</button>
+                  <button style={btnDanger('sm')} onClick={() => deleteRequest(req.id)} data-tooltip="Удалить заявку на материал">✕</button>
                 </div>
               </td>
             </tr>
@@ -209,7 +209,7 @@ export default function KpRequests({ projectId }: { projectId: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button style={btnPrimary('sm')} onClick={openNew}>+ Добавить материал</button>
+        <button style={btnPrimary('sm')} onClick={openNew} data-tooltip="Добавить новую заявку на коммерческое предложение (КП) по материалу или работе">+ Добавить материал</button>
       </div>
 
       {loading ? (
@@ -235,7 +235,8 @@ export default function KpRequests({ projectId }: { projectId: string }) {
               <div style={{ display: 'flex', gap: 0, marginBottom: 14, borderRadius: 6, overflow: 'hidden', border: `1px solid ${C.border}` }}>
                 {(['estimate', 'custom'] as const).map(m => (
                   <button key={m} onClick={() => { setForm(f => ({ ...f, mode: m, item_name: '', unit: '', quantity: '', estimate_item_id: '', max_qty: Infinity })); setSearch(''); }}
-                    style={{ flex: 1, padding: '8px 0', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: form.mode === m ? C.primary : C.surfaceAlt, color: form.mode === m ? '#fff' : C.textSec }}>
+                    style={{ flex: 1, padding: '8px 0', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: form.mode === m ? C.primary : C.surfaceAlt, color: form.mode === m ? '#fff' : C.textSec }}
+                    data-tooltip={m === 'estimate' ? 'Выбрать материал из позиций существующей сметы' : 'Добавить произвольный материал или дополнительные затраты вне сметы'}>
                     {m === 'estimate' ? 'Из сметы' : 'Произвольно (доп. затраты)'}
                   </button>
                 ))}
@@ -251,7 +252,8 @@ export default function KpRequests({ projectId }: { projectId: string }) {
                     <div style={{ padding: '8px 12px', background: C.primaryBg, borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <span style={{ color: C.primary, fontWeight: 600 }}>{form.item_name}</span>
                       <button onClick={() => setForm(f => ({ ...f, item_name: '', unit: '', quantity: '', estimate_item_id: '', max_qty: Infinity }))}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textSec, fontSize: 12 }}>
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textSec, fontSize: 12 }}
+                        data-tooltip="Сменить выбранную позицию из сметы">
                         Сменить
                       </button>
                     </div>
@@ -325,9 +327,10 @@ export default function KpRequests({ projectId }: { projectId: string }) {
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end', borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
-              <button style={btnOutline()} onClick={() => setModal(null)}>Отмена</button>
+              <button style={btnOutline()} onClick={() => setModal(null)} data-tooltip="Закрыть форму без сохранения">Отмена</button>
               <button style={btnPrimary()} onClick={save}
-                disabled={saving || !form.item_name.trim()}>
+                disabled={saving || !form.item_name.trim()}
+                data-tooltip="Сохранить заявку на материал или дополнительные затраты">
                 {saving ? 'Сохранение...' : 'Сохранить'}
               </button>
             </div>

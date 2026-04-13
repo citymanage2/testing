@@ -114,7 +114,7 @@ export default function ProjectsSidebar({ collapsed }: Props = {}) {
           width: '100%', padding: '7px 12px', background: C.primary, color: '#fff',
           border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-        }}>
+        }} data-tooltip="Создать новый проект для группировки смет, отслеживания бюджета и управления подрядчиками">
           <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Новый проект
         </button>
       </div>
@@ -177,7 +177,8 @@ export default function ProjectsSidebar({ collapsed }: Props = {}) {
                         </div>
                       )}
                       <button onClick={() => { setImportProjectId(p.id); importRef.current?.click(); }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 5, width: '100%', padding: '5px 8px', margin: '4px 0', background: 'transparent', border: `1px dashed ${C.border}`, borderRadius: 5, cursor: 'pointer', fontSize: 12, color: C.textSec }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, width: '100%', padding: '5px 8px', margin: '4px 0', background: 'transparent', border: `1px dashed ${C.border}`, borderRadius: 5, cursor: 'pointer', fontSize: 12, color: C.textSec }}
+                        data-tooltip="Импортировать смету из файла Excel в этот проект (файл будет обработан и создана смета)">
                         ⬆ Импорт Excel
                       </button>
                       {!detail || detail.tasks.length === 0
@@ -274,7 +275,8 @@ function TaskRow({ task: t, onNavigate, onDelete, onRename, draggable }: { task:
       <span style={{ fontSize: 8, color: STATUS_COLOR[t.status] || C.textMuted, flexShrink: 0 }}>●</span>
       {onDelete && (
         <button onClick={e => { e.stopPropagation(); onDelete(); }}
-          style={{ padding: '1px 5px', fontSize: 10, background: 'transparent', color: C.danger, border: 'none', borderRadius: 3, cursor: 'pointer', flexShrink: 0, opacity: hovered ? 1 : 0 }}>✕</button>
+          style={{ padding: '1px 5px', fontSize: 10, background: 'transparent', color: C.danger, border: 'none', borderRadius: 3, cursor: 'pointer', flexShrink: 0, opacity: hovered ? 1 : 0 }}
+          data-tooltip="Удалить смету из проекта">✕</button>
       )}
     </div>
   );

@@ -138,12 +138,12 @@ export default function ProjectDocuments({ projectId }: { projectId: string }) {
       {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <button style={segBtnStyle(filterCat === 'all')} onClick={() => setFilterCat('all')}>Все</button>
+          <button style={segBtnStyle(filterCat === 'all')} onClick={() => setFilterCat('all')} data-tooltip="Показать все документы проекта">Все</button>
           {Object.entries(CATEGORIES).map(([k, v]) => (
-            <button key={k} style={segBtnStyle(filterCat === k)} onClick={() => setFilterCat(k)}>{v}</button>
+            <button key={k} style={segBtnStyle(filterCat === k)} onClick={() => setFilterCat(k)} data-tooltip={`Показать только документы категории "${v}"`}>{v}</button>
           ))}
         </div>
-        <button style={{ ...btnPrimary('sm'), marginLeft: 'auto' }} onClick={() => setShowUpload(true)}>
+        <button style={{ ...btnPrimary('sm'), marginLeft: 'auto' }} onClick={() => setShowUpload(true)} data-tooltip="Загрузить новый документ в проект (ТЗ, проектная документация, смета и др.)">
           + Загрузить
         </button>
       </div>
@@ -181,9 +181,9 @@ export default function ProjectDocuments({ projectId }: { projectId: string }) {
                   </td>
                   <td style={TD}>{fmt(doc.uploaded_at)}</td>
                   <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-                    <button style={btnGhost('sm')} onClick={() => handleDownload(doc)} title="Скачать">⬇</button>
-                    <button style={btnGhost('sm')} onClick={() => setEditState({ docId: doc.id, status: doc.status, comment: doc.comment ?? '' })} title="Редактировать">✏️</button>
-                    <button style={btnDanger('sm')} onClick={() => handleDelete(doc.id)} title="Удалить">✕</button>
+                    <button style={btnGhost('sm')} onClick={() => handleDownload(doc)} data-tooltip="Скачать документ на компьютер">⬇</button>
+                    <button style={btnGhost('sm')} onClick={() => setEditState({ docId: doc.id, status: doc.status, comment: doc.comment ?? '' })} data-tooltip="Редактировать статус и комментарий документа">✏️</button>
+                    <button style={btnDanger('sm')} onClick={() => handleDelete(doc.id)} data-tooltip="Удалить документ из проекта">✕</button>
                   </td>
                 </tr>
               ))}
@@ -224,8 +224,8 @@ export default function ProjectDocuments({ projectId }: { projectId: string }) {
               </label>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-              <button style={btnOutline()} onClick={() => setShowUpload(false)}>Отмена</button>
-              <button style={btnPrimary()} onClick={handleUpload} disabled={!uploadFile || uploading}>
+              <button style={btnOutline()} onClick={() => setShowUpload(false)} data-tooltip="Закрыть форму загрузки без загрузки файла">Отмена</button>
+              <button style={btnPrimary()} onClick={handleUpload} disabled={!uploadFile || uploading} data-tooltip="Загрузить выбранный файл в проект">
                 {uploading ? 'Загрузка...' : 'Загрузить'}
               </button>
             </div>
@@ -255,8 +255,8 @@ export default function ProjectDocuments({ projectId }: { projectId: string }) {
               </label>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-              <button style={btnOutline()} onClick={() => setEditState(null)}>Отмена</button>
-              <button style={btnPrimary()} onClick={handleSaveEdit} disabled={saving}>
+              <button style={btnOutline()} onClick={() => setEditState(null)} data-tooltip="Закрыть форму без сохранения изменений">Отмена</button>
+              <button style={btnPrimary()} onClick={handleSaveEdit} disabled={saving} data-tooltip="Сохранить изменения статуса и комментария документа">
                 {saving ? 'Сохранение...' : 'Сохранить'}
               </button>
             </div>

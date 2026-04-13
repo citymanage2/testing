@@ -156,7 +156,7 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button style={btnPrimary('sm')} onClick={openNew}>+ Новый договор</button>
+        <button style={btnPrimary('sm')} onClick={openNew} data-tooltip="Создать новый договор с субподрядчиком">+ Новый договор</button>
       </div>
 
       {loading ? (
@@ -169,7 +169,7 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
             <div key={c.id} style={{ ...CARD, padding: 0 }}>
               {/* Contract row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', flexWrap: 'wrap' }}>
-                <button style={btnGhost('sm')} onClick={() => toggleExpand(c.id)}>
+                <button style={btnGhost('sm')} onClick={() => toggleExpand(c.id)} data-tooltip={expanded[c.id] ? 'Свернуть позиции договора' : 'Развернуть позиции и дополнительные соглашения договора'}>
                   {expanded[c.id] ? '▾' : '▸'}
                 </button>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{c.contract_number}</span>
@@ -179,8 +179,8 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
                 <span style={{ fontSize: 12, color: C.textMuted }}>Гарантия: {c.guarantee_pct}%</span>
                 {c.signed_at && <span style={{ fontSize: 12, color: C.textMuted }}>Подписан: {fmt(c.signed_at)}</span>}
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-                  <button style={btnOutline('sm')} onClick={() => openEdit(c)}>Изменить</button>
-                  <button style={btnDanger('sm')} onClick={() => deleteContract(c.id)}>✕</button>
+                  <button style={btnOutline('sm')} onClick={() => openEdit(c)} data-tooltip="Редактировать данные договора: номер, подрядчика, статус, условия">Изменить</button>
+                  <button style={btnDanger('sm')} onClick={() => deleteContract(c.id)} data-tooltip="Удалить договор">✕</button>
                 </div>
               </div>
 
@@ -190,7 +190,7 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <span style={{ fontSize: 13, fontWeight: 500 }}>Позиции договора</span>
                     {c.status !== 'signed' && (
-                      <button style={btnOutline('sm')} onClick={() => openItemsEditor(c)}>Редактировать позиции</button>
+                      <button style={btnOutline('sm')} onClick={() => openItemsEditor(c)} data-tooltip="Открыть редактор позиций договора: наименования, единицы, количество, цены">Редактировать позиции</button>
                     )}
                   </div>
                   {!itemsMap[c.id] ? (
@@ -228,7 +228,7 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
                   <div style={{ marginTop: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <span style={{ fontSize: 13, fontWeight: 600 }}>Доп. соглашения</span>
-                      <button style={btnGhost('sm')} onClick={() => loadAmendments(c.id)}>↻ Обновить</button>
+                      <button style={btnGhost('sm')} onClick={() => loadAmendments(c.id)} data-tooltip="Обновить список дополнительных соглашений к договору">↻ Обновить</button>
                     </div>
                     {amendments[c.id] ? (
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -257,7 +257,7 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
                         </tbody>
                       </table>
                     ) : (
-                      <button style={btnGhost('sm')} onClick={() => loadAmendments(c.id)}>Загрузить ДС</button>
+                      <button style={btnGhost('sm')} onClick={() => loadAmendments(c.id)} data-tooltip="Загрузить список дополнительных соглашений к этому договору">Загрузить ДС</button>
                     )}
                   </div>
                 </div>
@@ -310,8 +310,8 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
               </label>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-              <button style={btnOutline()} onClick={() => setContractModal(null)}>Отмена</button>
-              <button style={btnPrimary()} onClick={saveContract} disabled={saving}>
+              <button style={btnOutline()} onClick={() => setContractModal(null)} data-tooltip="Закрыть форму без сохранения">Отмена</button>
+              <button style={btnPrimary()} onClick={saveContract} disabled={saving} data-tooltip="Сохранить данные договора">
                 {saving ? 'Сохранение...' : 'Сохранить'}
               </button>
             </div>
@@ -361,7 +361,7 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
                         <input style={{ ...INPUT, minWidth: 100 }} value={it.notes} onChange={e => setItem(i, 'notes', e.target.value)} />
                       </td>
                       <td style={TD}>
-                        <button style={btnDanger('sm')} onClick={() => removeItem(i)}>✕</button>
+                        <button style={btnDanger('sm')} onClick={() => removeItem(i)} data-tooltip="Удалить эту строку из позиций договора">✕</button>
                       </td>
                     </tr>
                   ))}
@@ -369,11 +369,11 @@ export default function SubcontractorContracts({ projectId }: { projectId: strin
               </table>
             </div>
             <div style={{ marginBottom: 16 }}>
-              <button style={btnOutline('sm')} onClick={addItem}>+ Добавить строку</button>
+              <button style={btnOutline('sm')} onClick={addItem} data-tooltip="Добавить новую строку в позиции договора">+ Добавить строку</button>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button style={btnOutline()} onClick={() => setItemsModal(null)}>Отмена</button>
-              <button style={btnPrimary()} onClick={saveItems} disabled={savingItems}>
+              <button style={btnOutline()} onClick={() => setItemsModal(null)} data-tooltip="Закрыть редактор позиций без сохранения">Отмена</button>
+              <button style={btnPrimary()} onClick={saveItems} disabled={savingItems} data-tooltip="Сохранить позиции договора">
                 {savingItems ? 'Сохранение...' : 'Сохранить'}
               </button>
             </div>

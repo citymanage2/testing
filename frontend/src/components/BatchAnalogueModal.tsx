@@ -68,7 +68,7 @@ export default function BatchAnalogueModal({ taskId, items, onClose, onApplied }
       <div style={{ ...MODAL, maxWidth: 680, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
           <h3 style={{ margin: 0, fontSize: 16 }}>Подбор аналогов ({items.length} позиций)</h3>
-          <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer', color: C.textMuted }}>×</button>
+          <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer', color: C.textMuted }} data-tooltip="Закрыть без применения аналогов">×</button>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -111,10 +111,10 @@ export default function BatchAnalogueModal({ taskId, items, onClose, onApplied }
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
-          <button onClick={applyAll} disabled={applying || readyCount === 0} style={{ ...btnPrimary(), opacity: readyCount === 0 ? 0.5 : 1 }}>
+          <button onClick={applyAll} disabled={applying || readyCount === 0} style={{ ...btnPrimary(), opacity: readyCount === 0 ? 0.5 : 1 }} data-tooltip={`Применить выбранные аналоги к ${readyCount} позициям сметы — цены будут обновлены`}>
             {applying ? 'Применение...' : `Применить (${readyCount})`}
           </button>
-          <button onClick={onClose} style={btnOutline()}>Отмена</button>
+          <button onClick={onClose} style={btnOutline()} data-tooltip="Закрыть без применения аналогов">Отмена</button>
         </div>
       </div>
     </div>

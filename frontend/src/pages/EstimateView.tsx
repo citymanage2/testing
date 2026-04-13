@@ -524,33 +524,33 @@ export default function EstimateView() {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {/* Analysis group */}
             <div style={{ display: 'flex', gap: 4, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 4px' }}>
-              <button onClick={() => setShowHistory(true)} style={btnGhost('sm')} title="История версий">⏱ История</button>
-              <button onClick={() => setShowOpt(true)} style={btnGhost('sm')} title="Оптимизировать цены">✦ Оптимизация</button>
-              <button onClick={checkPairs} style={btnGhost('sm')} title="Проверить пары работа-материал">⚖ Пары</button>
+              <button onClick={() => setShowHistory(true)} style={btnGhost('sm')} data-tooltip="История версий сметы — посмотреть и восстановить предыдущие варианты">⏱ История</button>
+              <button onClick={() => setShowOpt(true)} style={btnGhost('sm')} data-tooltip="ИИ-оптимизация цен — автоматически найти более выгодные варианты работ и материалов">✦ Оптимизация</button>
+              <button onClick={checkPairs} style={btnGhost('sm')} data-tooltip="Проверить парность — найти работы без материалов и материалы без работ">⚖ Пары</button>
             </div>
 
             {/* Export group */}
             <div style={{ display: 'flex', gap: 4, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 4px' }}>
-              <button onClick={() => exportEstimate('all')} style={btnGhost('sm')}>⬇ Excel</button>
-              <button onClick={() => exportEstimate('works')} style={btnGhost('sm')}>Работы</button>
-              <button onClick={() => exportEstimate('materials')} style={btnGhost('sm')}>Материалы</button>
+              <button onClick={() => exportEstimate('all')} style={btnGhost('sm')} data-tooltip="Скачать полную смету (работы + материалы) в Excel">⬇ Excel</button>
+              <button onClick={() => exportEstimate('works')} style={btnGhost('sm')} data-tooltip="Скачать только строки с работами в Excel">Работы</button>
+              <button onClick={() => exportEstimate('materials')} style={btnGhost('sm')} data-tooltip="Скачать только строки с материалами в Excel">Материалы</button>
             </div>
 
             {/* More actions */}
             <div style={{ display: 'flex', gap: 4, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 4px' }}>
-              <button onClick={() => { setShowMove(false); loadProjects(); setShowMove(true); }} style={btnGhost('sm')}>↗ Переместить</button>
-              <button onClick={() => { setKpSelected(new Set()); setKpComment(''); setShowKP(true); }} style={btnGhost('sm')}>📨 Запрос КП</button>
-              <button onClick={() => setShowSepSheet(true)} style={btnGhost('sm')}>📑 Ведомость</button>
+              <button onClick={() => { setShowMove(false); loadProjects(); setShowMove(true); }} style={btnGhost('sm')} data-tooltip="Переместить смету в другой проект">↗ Переместить</button>
+              <button onClick={() => { setKpSelected(new Set()); setKpComment(''); setShowKP(true); }} style={btnGhost('sm')} data-tooltip="Сформировать запрос коммерческих предложений по материалам и скачать в Excel">📨 Запрос КП</button>
+              <button onClick={() => setShowSepSheet(true)} style={btnGhost('sm')} data-tooltip="Создать разделительную ведомость — Excel-файл с выбранными разделами или позициями">📑 Ведомость</button>
             </div>
 
             {/* AI + fullscreen */}
             <div style={{ display: 'flex', gap: 4, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 4px' }}>
-              <button onClick={() => setShowAiAssist(true)} style={btnGhost('sm')} title="ИИ-помощник">🤖 ИИ</button>
-              <button onClick={() => setFullscreen(f => !f)} style={btnGhost('sm')} title={fullscreen ? 'Свернуть' : 'Полный экран'}>{fullscreen ? '⊡' : '⛶'}</button>
+              <button onClick={() => setShowAiAssist(true)} style={btnGhost('sm')} data-tooltip="Открыть ИИ-помощника — задать вопрос по смете, попросить добавить позиции или пересчитать">🤖 ИИ</button>
+              <button onClick={() => setFullscreen(f => !f)} style={btnGhost('sm')} data-tooltip={fullscreen ? 'Свернуть смету до обычного размера' : 'Развернуть таблицу сметы на весь экран'}>{fullscreen ? '⊡' : '⛶'}</button>
             </div>
 
             {/* Destructive */}
-            <button onClick={deleteTask} style={btnDanger('sm')}>✕ Удалить</button>
+            <button onClick={deleteTask} style={btnDanger('sm')} data-tooltip="Безвозвратно удалить эту смету вместе со всеми позициями">✕ Удалить</button>
           </div>
         </div>
       </div>
@@ -572,8 +572,8 @@ export default function EstimateView() {
           style={{ ...INPUT, width: 200, padding: '5px 10px' }} />
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          <button onClick={addSection} disabled={isLocked} style={{ ...btnOutline('sm'), opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>+ Раздел</button>
-          <button onClick={() => setShowAddRow(true)} disabled={isLocked} style={{ ...btnPrimary('sm'), opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>+ Строка</button>
+          <button onClick={addSection} disabled={isLocked} style={{ ...btnOutline('sm'), opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }} data-tooltip="Добавить раздел-заголовок для группировки позиций сметы">+ Раздел</button>
+          <button onClick={() => setShowAddRow(true)} disabled={isLocked} style={{ ...btnPrimary('sm'), opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }} data-tooltip="Добавить новую строку вручную или выбрать из каталога расценок">+ Строка</button>
         </div>
       </div>
 
@@ -581,25 +581,25 @@ export default function EstimateView() {
       {selectedIds.size > 0 && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, padding: '8px 14px', background: C.primaryBg, borderRadius: 7, border: `1px solid ${C.primary}33`, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: C.primary, marginRight: 4 }}>Выбрано: {selectedIds.size}</span>
-          <button onClick={batchDelete} style={btnDanger('sm')}>✕ Удалить</button>
-          <button onClick={() => { setBatchSectionTarget(''); setShowBatchSection(true); }} style={btnOutline('sm')}>↗ В раздел</button>
-          <button onClick={() => { setBatchCoeff('1'); setShowBatchCoeff(true); }} style={btnOutline('sm')}>× Коэффициент</button>
+          <button onClick={batchDelete} style={btnDanger('sm')} data-tooltip="Удалить все выбранные строки сметы">✕ Удалить</button>
+          <button onClick={() => { setBatchSectionTarget(''); setShowBatchSection(true); }} style={btnOutline('sm')} data-tooltip="Переместить выбранные строки в другой раздел сметы">↗ В раздел</button>
+          <button onClick={() => { setBatchCoeff('1'); setShowBatchCoeff(true); }} style={btnOutline('sm')} data-tooltip="Умножить цены выбранных строк на коэффициент (например 0.9 для скидки 10%)">× Коэффициент</button>
           <button
             onClick={() => setShowBatchAnalogue(true)}
             disabled={data.items.filter(i => selectedIds.has(i.id) && i.type === 'Материал').length === 0}
             style={{ ...btnOutline('sm'), opacity: data.items.filter(i => selectedIds.has(i.id) && i.type === 'Материал').length === 0 ? 0.4 : 1 }}
-            title="Подобрать аналоги для выбранных материалов"
+            data-tooltip="Найти более дешёвые аналоги для выбранных материалов через ИИ"
           >
             🔍 Аналоги
           </button>
           <button
             onClick={batchSaveToCatalog}
             style={btnOutline('sm')}
-            title="Добавить выбранные позиции в прайс-лист"
+            data-tooltip="Сохранить выбранные позиции в каталог расценок для повторного использования"
           >
             📋 В прайс
           </button>
-          <button onClick={() => setSelectedIds(new Set())} style={btnGhost('sm')}>Снять выделение</button>
+          <button onClick={() => setSelectedIds(new Set())} style={btnGhost('sm')} data-tooltip="Снять выделение со всех строк">Снять выделение</button>
         </div>
       )}
 
@@ -613,8 +613,8 @@ export default function EstimateView() {
               <datalist id="sections-list">{allSections.map(s => <option key={s} value={s} />)}</datalist>
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button onClick={batchMoveSection} style={btnPrimary()}>Переместить</button>
-              <button onClick={() => setShowBatchSection(false)} style={btnOutline()}>Отмена</button>
+              <button onClick={batchMoveSection} style={btnPrimary()} data-tooltip="Переместить выбранные строки в указанный раздел">Переместить</button>
+              <button onClick={() => setShowBatchSection(false)} style={btnOutline()} data-tooltip="Закрыть без изменений">Отмена</button>
             </div>
           </div>
         </div>
@@ -629,8 +629,8 @@ export default function EstimateView() {
               <input type="number" min="0.01" step="0.01" value={batchCoeff} onChange={e => setBatchCoeff(e.target.value)} style={{ ...INPUT, marginTop: 4 }} />
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button onClick={batchApplyCoeff} style={btnPrimary()}>Применить</button>
-              <button onClick={() => setShowBatchCoeff(false)} style={btnOutline()}>Отмена</button>
+              <button onClick={batchApplyCoeff} style={btnPrimary()} data-tooltip="Умножить цены выбранных строк на введённый коэффициент">Применить</button>
+              <button onClick={() => setShowBatchCoeff(false)} style={btnOutline()} data-tooltip="Закрыть без изменений">Отмена</button>
             </div>
           </div>
         </div>
@@ -698,8 +698,8 @@ export default function EstimateView() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-              <button onClick={addRow} style={btnPrimary()} disabled={!newRow.name.trim()}>Добавить</button>
-              <button onClick={() => { setShowAddRow(false); setCatalogQuery(''); setCatalogResults([]); }} style={btnOutline()}>Отмена</button>
+              <button onClick={addRow} style={btnPrimary()} disabled={!newRow.name.trim()} data-tooltip="Добавить новую строку в смету">Добавить</button>
+              <button onClick={() => { setShowAddRow(false); setCatalogQuery(''); setCatalogResults([]); }} style={btnOutline()} data-tooltip="Закрыть без добавления">Отмена</button>
             </div>
           </div>
         </div>
@@ -734,15 +734,18 @@ export default function EstimateView() {
               style={{ width: 80, padding: '3px 8px', border: '1px solid #0ea5e9', borderRadius: 5, fontSize: 13 }}
             />
             <button onClick={() => applySubCoeff('all')} disabled={applyingCoeff || isLocked}
-              style={{ ...btnOutline('sm'), opacity: (applyingCoeff || isLocked) ? 0.5 : 1 }}>
+              style={{ ...btnOutline('sm'), opacity: (applyingCoeff || isLocked) ? 0.5 : 1 }}
+              data-tooltip="Применить понижающий коэффициент ко всем позициям сметы субподрядчика">
               × Вся смета
             </button>
             <button onClick={() => applySubCoeff('works')} disabled={applyingCoeff || isLocked}
-              style={{ ...btnOutline('sm'), opacity: (applyingCoeff || isLocked) ? 0.5 : 1 }}>
+              style={{ ...btnOutline('sm'), opacity: (applyingCoeff || isLocked) ? 0.5 : 1 }}
+              data-tooltip="Применить коэффициент только к строкам с работами">
               × Работы
             </button>
             <button onClick={() => applySubCoeff('materials')} disabled={applyingCoeff || isLocked}
-              style={{ ...btnOutline('sm'), opacity: (applyingCoeff || isLocked) ? 0.5 : 1 }}>
+              style={{ ...btnOutline('sm'), opacity: (applyingCoeff || isLocked) ? 0.5 : 1 }}
+              data-tooltip="Применить коэффициент только к строкам с материалами">
               × Материалы
             </button>
           </div>
@@ -815,7 +818,7 @@ export default function EstimateView() {
                         <span onClick={() => toggleSection(item.id)} style={{ cursor: 'pointer', userSelect: 'none' }}>
                           {isCollapsed ? '▶' : '▼'} {item.name}
                         </span>
-                        <button onClick={() => deleteItem(item.id)} disabled={isLocked} style={{ marginLeft: 8, padding: '1px 6px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 4, cursor: 'pointer', fontSize: 11, opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>✕</button>
+                        <button onClick={() => deleteItem(item.id)} disabled={isLocked} data-tooltip="Удалить раздел-заголовок из сметы" style={{ marginLeft: 8, padding: '1px 6px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 4, cursor: 'pointer', fontSize: 11, opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>✕</button>
                       </td>
                     </tr>
                   );
@@ -850,8 +853,8 @@ export default function EstimateView() {
                       <td style={TD}>{fmt(item.total)}</td>
                       <td style={TD}>
                         <div style={{ display: 'flex', gap: 4 }}>
-                          <button onClick={() => saveItemToCatalog(item.id)} title="Сохранить в каталог" style={{ padding: '2px 7px', background: C.successBg, color: C.success, border: `1px solid ${C.success}40`, borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>📋</button>
-                          <button onClick={() => deleteItem(item.id)} disabled={isLocked} style={{ padding: '2px 6px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 4, cursor: 'pointer', fontSize: 11, opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>✕</button>
+                          <button onClick={() => saveItemToCatalog(item.id)} data-tooltip="Сохранить эту позицию в каталог расценок" style={{ padding: '2px 7px', background: C.successBg, color: C.success, border: `1px solid ${C.success}40`, borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>📋</button>
+                          <button onClick={() => deleteItem(item.id)} disabled={isLocked} data-tooltip="Удалить строку из сметы" style={{ padding: '2px 6px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 4, cursor: 'pointer', fontSize: 11, opacity: isLocked ? 0.4 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>✕</button>
                         </div>
                       </td>
                     </tr>
@@ -866,7 +869,7 @@ export default function EstimateView() {
 
       {/* Extras (overhead/transport/contingency) */}
       <div style={{ marginBottom: 16 }}>
-        <button onClick={() => setShowExtras(!showExtras)} style={{ ...btnOutline('sm'), fontSize: 13 }}>
+        <button onClick={() => setShowExtras(!showExtras)} style={{ ...btnOutline('sm'), fontSize: 13 }} data-tooltip="Развернуть/свернуть блок дополнительных расходов: накладные, транспорт, непредвиденные. Суммируются к итогу сметы.">
           {showExtras ? '▲' : '▼'} Накладные, транспорт, непредвиденные расходы
         </button>
         {showExtras && (
@@ -886,7 +889,7 @@ export default function EstimateView() {
                 </div>
               ))}
             </div>
-            <button onClick={saveExtras} disabled={savingExtras} style={{ ...btnPrimary('sm'), marginTop: 12 }}>
+            <button onClick={saveExtras} disabled={savingExtras} style={{ ...btnPrimary('sm'), marginTop: 12 }} data-tooltip="Сохранить значения накладных, транспортных и непредвиденных расходов">
               {savingExtras ? 'Сохранение...' : 'Сохранить'}
             </button>
           </div>
@@ -941,7 +944,7 @@ export default function EstimateView() {
                   {p.name}
                 </button>
               ))}
-            <button onClick={() => setShowMove(false)} style={{ ...btnOutline('sm'), marginTop: 8 }}>Отмена</button>
+            <button onClick={() => setShowMove(false)} style={{ ...btnOutline('sm'), marginTop: 8 }} data-tooltip="Закрыть без перемещения">Отмена</button>
           </div>
         </div>
       )}
@@ -976,8 +979,8 @@ export default function EstimateView() {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowKP(false)} style={btnOutline()}>Отмена</button>
-              <button onClick={exportKP} style={btnPrimary()}>⬇ Скачать Excel</button>
+              <button onClick={() => setShowKP(false)} style={btnOutline()} data-tooltip="Закрыть без скачивания">Отмена</button>
+              <button onClick={exportKP} style={btnPrimary()} data-tooltip="Скачать Excel-файл с запросом коммерческих предложений по выбранным материалам">⬇ Скачать Excel</button>
             </div>
           </div>
         </div>
@@ -1024,8 +1027,8 @@ export default function EstimateView() {
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button onClick={downloadSepSheet} style={btnPrimary()}>⬇ Скачать Excel</button>
-              <button onClick={() => setShowSepSheet(false)} style={btnOutline()}>Отмена</button>
+              <button onClick={downloadSepSheet} style={btnPrimary()} data-tooltip="Скачать разделительную ведомость по выбранным разделам или позициям">⬇ Скачать Excel</button>
+              <button onClick={() => setShowSepSheet(false)} style={btnOutline()} data-tooltip="Закрыть без скачивания">Отмена</button>
             </div>
           </div>
         </div>

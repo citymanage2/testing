@@ -87,7 +87,7 @@ export default function CompanySettings() {
               ? <img src={logoPreview} alt="Лого" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
               : <span style={{ fontSize: 12, color: '#aaa', textAlign: 'center', padding: 8 }}>Логотип<br/>не загружен</span>}
           </div>
-          <button onClick={() => logoRef.current?.click()} disabled={logoUploading} style={btnStyle('#546e7a')}>
+          <button onClick={() => logoRef.current?.click()} disabled={logoUploading} style={btnStyle('#546e7a')} data-tooltip="Загрузить логотип компании (PNG/JPEG, макс. 512KB) — используется в заголовках документов">
             {logoUploading ? 'Загрузка...' : 'Загрузить логотип'}
           </button>
           <span style={{ fontSize: 11, color: '#888', textAlign: 'center' }}>PNG/JPEG, макс. 512KB</span>
@@ -96,7 +96,7 @@ export default function CompanySettings() {
       </div>
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <button onClick={save} disabled={saving} style={btnStyle('#1565c0')}>
+        <button onClick={save} disabled={saving} style={btnStyle('#1565c0')} data-tooltip="Сохранить реквизиты компании — они будут использоваться при генерации документов">
           {saving ? 'Сохранение...' : 'Сохранить'}
         </button>
         {saved && <span style={{ color: '#2e7d32', fontSize: 13 }}>✓ Сохранено</span>}

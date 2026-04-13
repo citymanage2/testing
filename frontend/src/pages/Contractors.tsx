@@ -59,14 +59,15 @@ export default function Contractors() {
     <div style={{ padding: 24, maxWidth: 1100 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0 }}>Контрагенты</h2>
-        <button onClick={openAdd} style={btn('#1565c0')}>+ Добавить</button>
+        <button onClick={openAdd} style={btn('#1565c0')} data-tooltip="Добавить нового контрагента: заказчика, поставщика или субподрядчика">+ Добавить</button>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        {['all', ...KINDS].map(k => (
+        {[['all', 'Все', 'Показать всех контрагентов'], ['client', 'Заказчик', 'Показать только заказчиков'], ['supplier', 'Поставщик', 'Показать только поставщиков'], ['subcontractor', 'Субподрядчик', 'Показать только субподрядчиков']].map(([k, label, tip]) => (
           <button key={k} onClick={() => setFilter(k)}
-            style={{ padding: '4px 14px', borderRadius: 4, border: '1px solid #ccc', background: filter === k ? '#1565c0' : '#fff', color: filter === k ? '#fff' : '#333', cursor: 'pointer', fontSize: 13 }}>
-            {k === 'all' ? 'Все' : KIND_LABELS[k]}
+            style={{ padding: '4px 14px', borderRadius: 4, border: '1px solid #ccc', background: filter === k ? '#1565c0' : '#fff', color: filter === k ? '#fff' : '#333', cursor: 'pointer', fontSize: 13 }}
+            data-tooltip={tip}>
+            {label}
           </button>
         ))}
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по названию или ИНН..."
@@ -96,8 +97,8 @@ export default function Contractors() {
                     <td style={{ ...td, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.address || '—'}</td>
                     <td style={td}>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <button onClick={() => openEdit(c)} style={{ padding: '2px 8px', fontSize: 11, border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', background: '#fff' }}>✎</button>
-                        <button onClick={() => del(c.id)} style={{ padding: '2px 6px', fontSize: 11, border: '1px solid #ef9a9a', borderRadius: 4, cursor: 'pointer', background: '#ffebee', color: '#c62828' }}>✕</button>
+                        <button onClick={() => openEdit(c)} style={{ padding: '2px 8px', fontSize: 11, border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', background: '#fff' }} data-tooltip="Редактировать данные контрагента: ИНН, КПП, контакты, адрес">✎</button>
+                        <button onClick={() => del(c.id)} style={{ padding: '2px 6px', fontSize: 11, border: '1px solid #ef9a9a', borderRadius: 4, cursor: 'pointer', background: '#ffebee', color: '#c62828' }} data-tooltip="Удалить контрагента из системы">✕</button>
                       </div>
                     </td>
                   </tr>
@@ -128,8 +129,8 @@ export default function Contractors() {
               <label style={lbl}>Примечание<textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...inp, resize: 'vertical' }} /></label>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button onClick={save} disabled={saving || !form.name.trim()} style={btn('#1565c0')}>{saving ? 'Сохранение...' : 'Сохранить'}</button>
-              <button onClick={() => setShowForm(false)} style={btn('#757575')}>Отмена</button>
+              <button onClick={save} disabled={saving || !form.name.trim()} style={btn('#1565c0')} data-tooltip="Сохранить данные контрагента">{saving ? 'Сохранение...' : 'Сохранить'}</button>
+              <button onClick={() => setShowForm(false)} style={btn('#757575')} data-tooltip="Закрыть форму без сохранения">Отмена</button>
             </div>
           </div>
         </div>

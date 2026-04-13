@@ -112,16 +112,17 @@ export default function Catalog() {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {dupCount !== null && dupCount > 0 && (
               <button onClick={deleteDups} disabled={deletingDups}
-                style={{ ...btnDanger('sm'), display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                style={{ ...btnDanger('sm'), display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                data-tooltip={`Удалить ${dupCount} дублирующихся записей из каталога, оставив последнюю версию каждой позиции`}>
                 {deletingDups ? '⏳...' : `🗑 Дубликаты (${dupCount})`}
               </button>
             )}
-            <button onClick={downloadTemplate} style={btnGhost('sm')} title="Скачать шаблон Excel">⬇ Шаблон</button>
-            <label style={{ ...btnOutline('sm'), cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+            <button onClick={downloadTemplate} style={btnGhost('sm')} data-tooltip="Скачать шаблон Excel для массового импорта расценок в каталог">⬇ Шаблон</button>
+            <label style={{ ...btnOutline('sm'), cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }} data-tooltip="Импортировать расценки из файла Excel (используйте шаблон для правильного формата)">
               {importing ? '⏳ Импорт...' : '📥 Импорт Excel'}
               <input ref={importRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleImport} disabled={importing} />
             </label>
-            <button onClick={openAdd} style={btnPrimary('sm')}>+ Добавить</button>
+            <button onClick={openAdd} style={btnPrimary('sm')} data-tooltip="Добавить новую расценку в корпоративный каталог вручную">+ Добавить</button>
           </div>
         </div>
 
@@ -136,9 +137,10 @@ export default function Catalog() {
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 2, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 6, padding: 3 }}>
-          {[['all', 'Все'], ['work', 'Работы'], ['material', 'Материалы']].map(([v, l]) => (
+          {[['all', 'Все', 'Показать все записи каталога'], ['work', 'Работы', 'Показать только расценки на работы'], ['material', 'Материалы', 'Показать только расценки на материалы']].map(([v, l, tip]) => (
             <button key={v} onClick={() => setTypeFilter(v)}
-              style={{ padding: '4px 12px', borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: typeFilter === v ? 600 : 400, background: typeFilter === v ? C.surface : 'transparent', color: typeFilter === v ? C.primary : C.textSec, boxShadow: typeFilter === v ? '0 1px 3px rgba(0,0,0,.1)' : 'none' }}>
+              style={{ padding: '4px 12px', borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: typeFilter === v ? 600 : 400, background: typeFilter === v ? C.surface : 'transparent', color: typeFilter === v ? C.primary : C.textSec, boxShadow: typeFilter === v ? '0 1px 3px rgba(0,0,0,.1)' : 'none' }}
+              data-tooltip={tip}>
               {l}
             </button>
           ))}
@@ -177,8 +179,8 @@ export default function Catalog() {
                     <td style={{ ...TD, fontSize: 11, color: C.textMuted, whiteSpace: 'nowrap' }}>{new Date(e.updated_at || e.created_at).toLocaleDateString('ru-RU')}</td>
                     <td style={TD}>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <button onClick={() => openEdit(e)} style={btnGhost('sm')}>✎</button>
-                        <button onClick={() => del(e.id)} style={{ ...btnDanger('sm'), padding: '2px 6px' }}>✕</button>
+                        <button onClick={() => openEdit(e)} style={btnGhost('sm')} data-tooltip="Редактировать расценку: тип, наименование, единицу, цены, теги">✎</button>
+                        <button onClick={() => del(e.id)} style={{ ...btnDanger('sm'), padding: '2px 6px' }} data-tooltip="Удалить расценку из корпоративного каталога">✕</button>
                       </div>
                     </td>
                   </tr>
@@ -215,8 +217,8 @@ export default function Catalog() {
               </label>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button onClick={save} disabled={saving || !form.name.trim()} style={btnPrimary()}>{saving ? 'Сохранение...' : 'Сохранить'}</button>
-              <button onClick={() => setShowForm(false)} style={btnOutline()}>Отмена</button>
+              <button onClick={save} disabled={saving || !form.name.trim()} style={btnPrimary()} data-tooltip="Сохранить расценку в корпоративный каталог">{saving ? 'Сохранение...' : 'Сохранить'}</button>
+              <button onClick={() => setShowForm(false)} style={btnOutline()} data-tooltip="Закрыть форму без сохранения">Отмена</button>
             </div>
           </div>
         </div>

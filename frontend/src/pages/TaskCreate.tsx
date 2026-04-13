@@ -63,7 +63,7 @@ export default function TaskCreate() {
           <FileUpload files={files} onChange={setFiles} />
         </div>
         {error && <p style={{ color: '#f44336', margin: 0 }}>{error}</p>}
-        <button type="submit" disabled={loading} style={{ padding: '10px', fontSize: 15, borderRadius: 4, border: 'none', background: loading ? '#bdbdbd' : '#1565c0', color: '#fff', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 600 }}>
+        <button type="submit" disabled={loading} style={{ padding: '10px', fontSize: 15, borderRadius: 4, border: 'none', background: loading ? '#bdbdbd' : '#1565c0', color: '#fff', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 600 }} data-tooltip="Отправить задачу ИИ на обработку. После создания вы будете перенаправлены на страницу отслеживания результата.">
           {loading ? 'Создание...' : 'Создать задачу'}
         </button>
       </form>

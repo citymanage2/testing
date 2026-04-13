@@ -315,7 +315,7 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
         <div style={sectionTitle}>
           <span>Назначение субподрядчиков</span>
           {!showNewAssign && (
-            <button style={btnOutline('sm')} onClick={() => setShowNewAssign(true)}>
+            <button style={btnOutline('sm')} onClick={() => setShowNewAssign(true)} data-tooltip="Назначить субподрядчика для выполнения работ по этой смете">
               + Назначить
             </button>
           )}
@@ -351,7 +351,7 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
               style={btnDanger('sm')}
               disabled={deletingAssign === a.id}
               onClick={() => deleteAssignment(a.id)}
-              title="Удалить назначение"
+              data-tooltip="Удалить назначение субподрядчика"
             >
               {deletingAssign === a.id ? '...' : '✕'}
             </button>
@@ -433,10 +433,10 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
             </label>
 
             <div style={{ display: 'flex', gap: 8 }}>
-              <button style={btnPrimary('sm')} disabled={savingAssign || !newAssign.contractor_id} onClick={saveAssignment}>
+              <button style={btnPrimary('sm')} disabled={savingAssign || !newAssign.contractor_id} onClick={saveAssignment} data-tooltip="Сохранить назначение субподрядчика на выполнение работ">
                 {savingAssign ? 'Сохранение...' : 'Сохранить'}
               </button>
-              <button style={btnGhost('sm')} onClick={() => { setShowNewAssign(false); setNewAssign({ contractor_id: '', scope_type: 'all', scope_ref: '', notes: '' }); }}>
+              <button style={btnGhost('sm')} onClick={() => { setShowNewAssign(false); setNewAssign({ contractor_id: '', scope_type: 'all', scope_ref: '', notes: '' }); }} data-tooltip="Отменить создание назначения">
                 Отмена
               </button>
             </div>
@@ -449,7 +449,7 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
         <div style={sectionTitle}>
           <span>Акты приемки работ</span>
           {!showNewAcc && (
-            <button style={btnPrimary('sm')} onClick={() => setShowNewAcc(true)}>
+            <button style={btnPrimary('sm')} onClick={() => setShowNewAcc(true)} data-tooltip="Создать новый акт приёмки выполненных работ">
               + Новый акт
             </button>
           )}
@@ -530,10 +530,11 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
                 style={btnPrimary('sm')}
                 disabled={savingAcc || !newAcc.contractor_id || !newAcc.act_number}
                 onClick={saveAcceptance}
+                data-tooltip="Сохранить данные акта приёмки"
               >
                 {savingAcc ? 'Сохранение...' : 'Сохранить'}
               </button>
-              <button style={btnGhost('sm')} onClick={() => { setShowNewAcc(false); setNewAcc({ contractor_id: '', act_number: '', period_start: '', period_end: '', notes: '' }); }}>
+              <button style={btnGhost('sm')} onClick={() => { setShowNewAcc(false); setNewAcc({ contractor_id: '', act_number: '', period_start: '', period_end: '', notes: '' }); }} data-tooltip="Отменить создание акта">
                 Отмена
               </button>
             </div>
@@ -571,7 +572,7 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
                 <button
                   style={{ ...btnGhost('sm'), padding: '2px 6px', fontSize: 16, color: C.primary }}
                   onClick={() => toggleExpand(acc.id)}
-                  title={isExpanded ? 'Свернуть' : 'Развернуть'}
+                  data-tooltip={isExpanded ? 'Свернуть список позиций акта' : 'Развернуть список позиций акта'}
                 >
                   {isExpanded ? '▾' : '▸'}
                 </button>
@@ -599,7 +600,7 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
                 <button
                   style={btnOutline('sm')}
                   disabled={updatingStatus === acc.id}
-                  title="Изменить статус"
+                  data-tooltip="Изменить статус акта: Черновик → Принят → Отклонён"
                   onClick={() => {
                     const next = acc.status === 'draft' ? 'accepted' : acc.status === 'accepted' ? 'rejected' : 'draft';
                     updateStatus(acc.id, next);
@@ -611,7 +612,7 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
                 <button
                   style={btnDanger('sm')}
                   disabled={deletingAcc === acc.id}
-                  title="Удалить акт"
+                  data-tooltip="Удалить акт приёмки работ"
                   onClick={() => deleteAcceptance(acc.id)}
                 >
                   {deletingAcc === acc.id ? '...' : '✕'}
@@ -707,12 +708,14 @@ export default function WorkAcceptancePanel({ taskId, items }: Props) {
                       style={btnPrimary('sm')}
                       disabled={savingItems === acc.id}
                       onClick={() => saveAccItems(acc.id)}
+                      data-tooltip="Сохранить принятые объёмы работ по позициям акта"
                     >
                       {savingItems === acc.id ? 'Сохранение...' : 'Сохранить позиции'}
                     </button>
                     <button
                       style={btnOutline('sm')}
                       onClick={() => window.open(`/ks2-preview/${taskId}/${acc.id}`, '_blank')}
+                      data-tooltip="Открыть предпросмотр и сформировать унифицированную форму КС-2 для данного акта"
                     >
                       Создать КС-2
                     </button>

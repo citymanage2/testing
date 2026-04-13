@@ -216,11 +216,11 @@ export default function ProjectDetail() {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {editing ? (
               <>
-                <button onClick={saveCard} disabled={saving} style={btnPrimary('sm')}>{saving ? 'Сохранение...' : 'Сохранить'}</button>
-                <button onClick={() => { setEditing(false); setForm(card); }} style={btnOutline('sm')}>Отмена</button>
+                <button onClick={saveCard} disabled={saving} style={btnPrimary('sm')} data-tooltip="Сохранить изменения по проекту">{saving ? 'Сохранение...' : 'Сохранить'}</button>
+                <button onClick={() => { setEditing(false); setForm(card); }} style={btnOutline('sm')} data-tooltip="Отменить редактирование без сохранения">Отмена</button>
               </>
             ) : (
-              <button onClick={() => setEditing(true)} style={btnGhost('sm')}>✎ Редактировать</button>
+              <button onClick={() => setEditing(true)} style={btnGhost('sm')} data-tooltip="Редактировать реквизиты проекта: адрес, заказчик, даты, бюджет">✎ Редактировать</button>
             )}
           </div>
         </div>
@@ -236,12 +236,12 @@ export default function ProjectDetail() {
                     <option value="">— не указан —</option>
                     {clientContractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  <button type="button" style={btnGhost('sm')} title="Создать нового заказчика" onClick={() => setShowNewClientForm(v => !v)}>+</button>
+                  <button type="button" style={btnGhost('sm')} data-tooltip="Создать нового заказчика и сразу привязать к проекту" onClick={() => setShowNewClientForm(v => !v)}>+</button>
                 </div>
                 {showNewClientForm && (
                   <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                     <input value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder="Название заказчика" style={{ ...INPUT, flex: 1 }} />
-                    <button type="button" disabled={savingNewClient || !newClientName.trim()} style={btnPrimary('sm')} onClick={async () => {
+                    <button type="button" disabled={savingNewClient || !newClientName.trim()} style={btnPrimary('sm')} data-tooltip="Создать заказчика с введённым названием" onClick={async () => {
                       setSavingNewClient(true);
                       try {
                         const r = await client.post('/contractors', { kind: 'client', name: newClientName.trim() });
@@ -250,7 +250,7 @@ export default function ProjectDetail() {
                         setNewClientName(''); setShowNewClientForm(false);
                       } finally { setSavingNewClient(false); }
                     }}>{savingNewClient ? '...' : 'Создать'}</button>
-                    <button type="button" style={btnGhost('sm')} onClick={() => { setShowNewClientForm(false); setNewClientName(''); }}>✕</button>
+                    <button type="button" style={btnGhost('sm')} data-tooltip="Отменить создание заказчика" onClick={() => { setShowNewClientForm(false); setNewClientName(''); }}>✕</button>
                   </div>
                 )}
               </label>
@@ -328,7 +328,7 @@ export default function ProjectDetail() {
                     {isAllowed && !isCurrent && (
                       <button
                         style={{ ...btnOutline('sm'), marginTop: 4 }}
-                        title={suggestion?.condition_hint}
+                        data-tooltip={suggestion?.condition_hint ? `Перейти на стадию "${STAGE_LABELS[stage]}"\n${suggestion.condition_hint}` : `Перейти на стадию "${STAGE_LABELS[stage]}"`}
                         onClick={() => { setPendingStage(stage); setShowStageModal(true); }}
                       >
                         Перейти →
@@ -348,6 +348,7 @@ export default function ProjectDetail() {
                         <button
                           disabled={savingPm || !pmNameInput.trim()}
                           style={btnPrimary('sm')}
+                          data-tooltip="Назначить руководителя проекта — необходимо для перехода в стадию Реализации"
                           onClick={async () => {
                             setSavingPm(true);
                             try {
@@ -409,7 +410,7 @@ export default function ProjectDetail() {
       {tab === 'gallery' && (
         <div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
-            <button onClick={() => galleryInputRef.current?.click()} style={btnPrimary('sm')}>+ Загрузить фото</button>
+            <button onClick={() => galleryInputRef.current?.click()} style={btnPrimary('sm')} data-tooltip="Загрузить фотографии объекта (PNG/JPEG/WebP, до 5MB каждая)">+ Загрузить фото</button>
             <span style={{ fontSize: 12, color: C.textMuted }}>PNG/JPEG/WebP, макс. 5MB</span>
             <input ref={galleryInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={uploadImages} />
           </div>
@@ -424,6 +425,7 @@ export default function ProjectDetail() {
                       onClick={() => setLightbox(img.id)} />
                     {img.caption && <div style={{ padding: '4px 8px', fontSize: 11, color: C.textSec }}>{img.caption}</div>}
                     <button onClick={() => { if (confirm('Удалить фото?')) client.delete(`/projects/${id}/gallery/${img.id}`).then(loadAll); }}
+                      data-tooltip="Удалить это фото из галереи"
                       style={{ position: 'absolute', top: 4, right: 4, padding: '2px 6px', background: 'rgba(0,0,0,0.55)', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>✕</button>
                   </div>
                 ))}
@@ -458,7 +460,7 @@ export default function ProjectDetail() {
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
             <h3 style={{ margin: 0, fontSize: 15, color: C.text }}>Платежи</h3>
-            <button onClick={() => setShowPayForm(v => !v)} style={btnPrimary('sm')}>+ Добавить</button>
+            <button onClick={() => setShowPayForm(v => !v)} style={btnPrimary('sm')} data-tooltip="Добавить платёж: доход (от заказчика) или расход (подрядчику, поставщику)">+ Добавить</button>
           </div>
           {showPayForm && (
             <div style={{ ...CARD, padding: 14, marginBottom: 14 }}>
@@ -470,8 +472,8 @@ export default function ProjectDetail() {
                 <label style={{ ...LBL, gridColumn: '1/-1' }}>Описание<input value={payForm.description} onChange={e => setPayForm(f => ({ ...f, description: e.target.value }))} style={{ ...INPUT, marginTop: 4 }} /></label>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <button onClick={addPayment} disabled={!payForm.amount} style={btnPrimary('sm')}>Добавить</button>
-                <button onClick={() => setShowPayForm(false)} style={btnOutline('sm')}>Отмена</button>
+                <button onClick={addPayment} disabled={!payForm.amount} style={btnPrimary('sm')} data-tooltip="Сохранить платёж">Добавить</button>
+                <button onClick={() => setShowPayForm(false)} style={btnOutline('sm')} data-tooltip="Закрыть форму без добавления">Отмена</button>
               </div>
             </div>
           )}
@@ -489,7 +491,7 @@ export default function ProjectDetail() {
                         <td style={{ ...TD, fontWeight: 600, color: p.direction === 'income' ? C.success : C.danger }}>{fmt(p.amount)} ₽</td>
                         <td style={TD}>{p.contractor_name || '—'}</td>
                         <td style={TD}>{p.description || '—'}</td>
-                        <td style={TD}><button onClick={() => { if (confirm('Удалить?')) client.delete(`/projects/${id}/payments/${p.id}`).then(loadAll); }} style={{ ...btnDanger('sm'), padding: '2px 6px' }}>✕</button></td>
+                        <td style={TD}><button onClick={() => { if (confirm('Удалить?')) client.delete(`/projects/${id}/payments/${p.id}`).then(loadAll); }} style={{ ...btnDanger('sm'), padding: '2px 6px' }} data-tooltip="Удалить этот платёж">✕</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -520,7 +522,7 @@ export default function ProjectDetail() {
           {/* Client estimates with their sub-estimates */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <h4 style={{ margin: 0, fontSize: 14, color: C.text, fontWeight: 600 }}>Сметы с заказчиком</h4>
-            <button style={btnPrimary('sm')} onClick={async () => {
+            <button style={btnPrimary('sm')} data-tooltip="Создать пустую клиентскую смету для ручного заполнения или последующей генерации ИИ" onClick={async () => {
               const n = prompt('Название новой сметы:');
               if (!n?.trim()) return;
               const r = await client.post('/tasks/create-manual', { name: n.trim(), project_id: id, estimate_type: 'main' });
@@ -556,7 +558,7 @@ export default function ProjectDetail() {
                         setShowSubModal(true);
                       }}
                       style={{ ...btnOutline('sm'), flexShrink: 0, whiteSpace: 'nowrap' }}
-                      title="Создать смету с подрядчиком для этой сметы"
+                      data-tooltip="Создать смету с подрядчиком на основании этой клиентской сметы"
                     >+ Подрядчик</button>
                     <button
                       onClick={async () => {
@@ -565,6 +567,7 @@ export default function ProjectDetail() {
                         catch { alert('Ошибка удаления'); }
                       }}
                       style={{ padding: '6px 10px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
+                      data-tooltip="Безвозвратно удалить эту смету"
                     >✕</button>
                   </div>
                   {/* Linked sub-estimates */}
@@ -590,6 +593,7 @@ export default function ProjectDetail() {
                           catch { alert('Ошибка удаления'); }
                         }}
                         style={{ padding: '6px 10px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
+                        data-tooltip="Безвозвратно удалить смету с подрядчиком"
                       >✕</button>
                     </div>
                   ))}
@@ -603,7 +607,7 @@ export default function ProjectDetail() {
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 20, marginBottom: 10 }}>
                 <h4 style={{ margin: 0, fontSize: 14, color: C.text, fontWeight: 600 }}>Сметы с подрядчиком (без привязки)</h4>
-                <button style={btnOutline('sm')} onClick={() => {
+                <button style={btnOutline('sm')} data-tooltip="Создать смету с подрядчиком без привязки к клиентской смете" onClick={() => {
                   setSubParentId('');
                   setSubModalForm({ sourceTaskId: '', name: '' });
                   setShowSubModal(true);
@@ -629,6 +633,7 @@ export default function ProjectDetail() {
                       catch { alert('Ошибка удаления'); }
                     }}
                     style={{ padding: '6px 10px', background: C.dangerBg, color: C.danger, border: `1px solid ${C.dangerBorder}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
+                    data-tooltip="Безвозвратно удалить эту смету с подрядчиком"
                   >✕</button>
                 </div>
               ))}
@@ -638,7 +643,7 @@ export default function ProjectDetail() {
           {/* Button to add standalone sub-estimate when no client estimates */}
           {clientEstimates.length === 0 && (
             <div style={{ marginTop: 16 }}>
-              <button style={btnOutline('sm')} onClick={() => {
+              <button style={btnOutline('sm')} data-tooltip="Создать отдельную смету с подрядчиком (без привязки к смете заказчика)" onClick={() => {
                 setSubParentId('');
                 setSubModalForm({ sourceTaskId: '', name: '' });
                 setShowSubModal(true);
@@ -657,8 +662,8 @@ export default function ProjectDetail() {
               <textarea value={stageReason} onChange={e => setStageReason(e.target.value)} rows={3} style={{ ...INPUT, marginTop: 4, resize: 'vertical' }} />
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button onClick={doStageTransition} style={btnPrimary()}>Подтвердить переход</button>
-              <button onClick={() => setShowStageModal(false)} style={btnOutline()}>Отмена</button>
+              <button onClick={doStageTransition} style={btnPrimary()} data-tooltip={`Перевести проект на стадию: ${STAGE_LABELS[pendingStage] || pendingStage}`}>Подтвердить переход</button>
+              <button onClick={() => setShowStageModal(false)} style={btnOutline()} data-tooltip="Отменить переход между стадиями">Отмена</button>
             </div>
           </div>
         </div>
@@ -694,10 +699,12 @@ export default function ProjectDetail() {
                     ) : (
                       <>
                         <button style={{ ...btnGhost('sm'), fontSize: 12 }}
+                          data-tooltip="Выбрать все позиции для копирования в смету подрядчика"
                           onClick={() => setSubSelectedIds(new Set(subSourceItems.map(i => i.id)))}>
                           Выбрать все
                         </button>
                         <button style={{ ...btnGhost('sm'), fontSize: 12 }}
+                          data-tooltip="Снять выделение со всех позиций"
                           onClick={() => setSubSelectedIds(new Set())}>
                           Снять все
                         </button>
@@ -752,7 +759,7 @@ export default function ProjectDetail() {
               </label>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-              <button disabled={savingSub} style={btnPrimary()} onClick={async () => {
+              <button disabled={savingSub} style={btnPrimary()} data-tooltip="Создать смету с подрядчиком и открыть её для редактирования" onClick={async () => {
                 setSavingSub(true);
                 try {
                   let newTaskId: string;
@@ -779,7 +786,7 @@ export default function ProjectDetail() {
                   alert(e?.response?.data?.detail || 'Ошибка создания сметы');
                 } finally { setSavingSub(false); }
               }}>{savingSub ? 'Создание...' : 'Создать'}</button>
-              <button style={btnOutline()} onClick={() => setShowSubModal(false)}>Отмена</button>
+              <button style={btnOutline()} data-tooltip="Закрыть без создания сметы" onClick={() => setShowSubModal(false)}>Отмена</button>
             </div>
           </div>
         </div>

@@ -203,14 +203,14 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 2 }}>
-        <button style={tabStyle(tab === 'acts')} onClick={() => setTab('acts')}>Акты КС-2</button>
-        <button style={tabStyle(tab === 'summary')} onClick={() => setTab('summary')}>Прогресс актирования</button>
+        <button style={tabStyle(tab === 'acts')} onClick={() => setTab('acts')} data-tooltip="Список актов выполненных работ КС-2">Акты КС-2</button>
+        <button style={tabStyle(tab === 'summary')} onClick={() => setTab('summary')} data-tooltip="Сводная таблица — сколько позиций и объёмов уже закрыто актами">Прогресс актирования</button>
       </div>
 
       {tab === 'acts' && (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button style={btnPrimary('sm')} onClick={() => setActModal(true)}>+ Новый акт</button>
+            <button style={btnPrimary('sm')} onClick={() => setActModal(true)} data-tooltip="Создать новый акт КС-2 выполненных работ">+ Новый акт</button>
           </div>
 
           {loading ? (
@@ -222,7 +222,7 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
               {acts.map(act => (
                 <div key={act.id} style={{ ...CARD, padding: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', flexWrap: 'wrap' }}>
-                    <button style={btnGhost('sm')} onClick={() => toggleExpand(act.id)}>
+                    <button style={btnGhost('sm')} onClick={() => toggleExpand(act.id)} data-tooltip="Раскрыть / свернуть детали акта">
                       {expanded[act.id] ? '▾' : '▸'}
                     </button>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>№ {act.act_number}</span>
@@ -236,21 +236,21 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
                       {act.total_amount?.toLocaleString('ru-RU')} ₽
                     </span>
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      <button style={btnOutline('sm')} onClick={() => openItemsEditor(act)}>Позиции</button>
+                      <button style={btnOutline('sm')} onClick={() => openItemsEditor(act)} data-tooltip="Открыть редактор позиций акта — указать объёмы по каждой позиции">Позиции</button>
                       {act.status === 'draft' && (
-                        <button style={btnOutline('sm')} onClick={() => updateStatus(act, 'sent')}>Отправить</button>
+                        <button style={btnOutline('sm')} onClick={() => updateStatus(act, 'sent')} data-tooltip="Отправить акт заказчику на подписание">Отправить</button>
                       )}
                       {act.status === 'sent' && (
                         <>
-                          <button style={btnOutline('sm')} onClick={() => updateStatus(act, 'signed')}>Подписать</button>
-                          <button style={btnOutline('sm')} onClick={() => updateStatus(act, 'revision')}>На доработку</button>
+                          <button style={btnOutline('sm')} onClick={() => updateStatus(act, 'signed')} data-tooltip="Отметить акт как подписанный обеими сторонами">Подписать</button>
+                          <button style={btnOutline('sm')} onClick={() => updateStatus(act, 'revision')} data-tooltip="Вернуть акт на доработку — заказчик запросил исправления">На доработку</button>
                         </>
                       )}
                       {act.status === 'revision' && (
-                        <button style={btnOutline('sm')} onClick={() => updateStatus(act, 'sent')}>Повторно отправить</button>
+                        <button style={btnOutline('sm')} onClick={() => updateStatus(act, 'sent')} data-tooltip="Повторно отправить акт после исправлений">Повторно отправить</button>
                       )}
                       {act.status === 'draft' && (
-                        <button style={btnDanger('sm')} onClick={() => deleteAct(act.id)}>✕</button>
+                        <button style={btnDanger('sm')} onClick={() => deleteAct(act.id)} data-tooltip="Удалить черновик акта">✕</button>
                       )}
                       {act.status === 'signed' && (
                         <a
@@ -408,8 +408,8 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-              <button style={btnOutline()} onClick={() => setActModal(false)}>Отмена</button>
-              <button style={btnPrimary()} onClick={saveAct} disabled={savingAct}>
+              <button style={btnOutline()} onClick={() => setActModal(false)} data-tooltip="Закрыть без создания акта">Отмена</button>
+              <button style={btnPrimary()} onClick={saveAct} disabled={savingAct} data-tooltip="Создать акт КС-2 с выбранными параметрами">
                 {savingAct ? 'Создание...' : 'Создать'}
               </button>
             </div>
@@ -483,8 +483,8 @@ export default function ClientActsManager({ projectId }: { projectId: string }) 
               </table>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button style={btnOutline()} onClick={() => setItemsModal(null)}>Отмена</button>
-              <button style={btnPrimary()} onClick={saveItems} disabled={savingItems}>
+              <button style={btnOutline()} onClick={() => setItemsModal(null)} data-tooltip="Закрыть без сохранения позиций">Отмена</button>
+              <button style={btnPrimary()} onClick={saveItems} disabled={savingItems} data-tooltip="Сохранить введённые объёмы по позициям акта">
                 {savingItems ? 'Сохранение...' : 'Сохранить'}
               </button>
             </div>

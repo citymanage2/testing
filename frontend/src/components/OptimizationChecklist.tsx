@@ -36,7 +36,7 @@ export default function OptimizationChecklist({ taskId, onClose, onOptimized }: 
       <div style={{ background: '#fff', borderRadius: 8, width: '90%', maxWidth: 620, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0 }}>Оптимизация сметы</h3>
-          <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer' }}>×</button>
+          <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer' }} data-tooltip="Закрыть без применения оптимизации">×</button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
           {loading && <p style={{ color: '#aaa' }}>Анализ...</p>}
@@ -57,7 +57,7 @@ export default function OptimizationChecklist({ taskId, onClose, onOptimized }: 
         {!loading && !error && items.length > 0 && (
           <div style={{ padding: '12px 20px', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13 }}>Выбрано: {selected.size} | Экономия: <strong style={{ color: '#4caf50' }}>{fmt(selectedSavings)} ₽</strong></span>
-            <button onClick={execute} disabled={executing || selected.size === 0} style={{ padding: '8px 18px', background: executing ? '#bdbdbd' : '#4caf50', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>
+            <button onClick={execute} disabled={executing || selected.size === 0} style={{ padding: '8px 18px', background: executing ? '#bdbdbd' : '#4caf50', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }} data-tooltip="Применить выбранные оптимизации к смете — снизить цены позиций до найденных аналогов">
               {executing ? 'Выполняется...' : 'Оптимизировать'}
             </button>
           </div>

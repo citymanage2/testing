@@ -119,7 +119,7 @@ export default function Layout() {
         <div style={{ padding: collapsed ? '10px 8px' : '10px 12px', flexShrink: 0 }}>
           <button
             onClick={() => navigate('/task/create')}
-            title="Новая задача"
+            data-tooltip="Создать новую задачу ИИ: смета из ТЗ, из проекта, распознавание скана и другие типы"
             style={{
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start',
               gap: 6, padding: collapsed ? '7px' : '7px 12px',
@@ -197,7 +197,7 @@ export default function Layout() {
         <div style={{ flexShrink: 0, borderTop: `1px solid ${C.border}`, padding: '6px 8px' }}>
           <button
             onClick={() => setCollapsed(v => !v)}
-            title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+            data-tooltip={collapsed ? 'Развернуть боковое меню' : 'Свернуть боковое меню'}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start',
               gap: 8, padding: '7px 8px',
@@ -223,7 +223,7 @@ export default function Layout() {
 
           <button
             onClick={copyLogs}
-            title="Скопировать лог активности"
+            data-tooltip="Скопировать лог активности в буфер обмена"
             style={{
               width: 32, height: 32, borderRadius: 8,
               background: C.surface, border: `1px solid ${C.border}`,
@@ -287,7 +287,7 @@ export default function Layout() {
           <>
             <button
               onClick={copyLogs}
-              title="Скопировать логи"
+              data-tooltip="Скопировать все логи активности в буфер обмена"
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '8px 14px', borderRadius: 8, border: 'none',
@@ -301,7 +301,7 @@ export default function Layout() {
             </button>
             <button
               onClick={downloadLogs}
-              title="Скачать логи"
+              data-tooltip="Скачать все логи активности в текстовый файл (.txt)"
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '8px 14px', borderRadius: 8, border: 'none',
@@ -317,7 +317,7 @@ export default function Layout() {
         )}
         <button
           onClick={() => setLogMenuOpen(v => !v)}
-          title="Логи"
+          data-tooltip={logMenuOpen ? 'Закрыть меню логов' : 'Открыть меню логов активности'}
           style={{
             width: 44, height: 44, borderRadius: '50%', border: 'none',
             background: logMenuOpen ? '#555' : '#333', color: '#fff',

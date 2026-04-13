@@ -203,7 +203,7 @@ export default function PurchaseRequests({ projectId }: { projectId: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button style={btnPrimary('sm')} onClick={() => setNewModal(true)}>+ Новая заявка</button>
+        <button style={btnPrimary('sm')} onClick={() => setNewModal(true)} data-tooltip="Создать новую заявку на закупку материалов">+ Новая заявка</button>
       </div>
 
       {loading ? (
@@ -230,16 +230,16 @@ export default function PurchaseRequests({ projectId }: { projectId: string }) {
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                 {p.status === 'draft' ? (
                   <>
-                    <button style={btnOutline('sm')} onClick={() => openItemsEditor(p)}>Редактировать</button>
-                    <button style={btnPrimary('sm')} onClick={() => confirmPurchase(p)}>Подтвердить</button>
-                    <button style={btnDanger('sm')} onClick={() => deletePurchase(p.id)}>✕</button>
+                    <button style={btnOutline('sm')} onClick={() => openItemsEditor(p)} data-tooltip="Редактировать позиции заявки на закупку">Редактировать</button>
+                    <button style={btnPrimary('sm')} onClick={() => confirmPurchase(p)} data-tooltip="Подтвердить заявку — материалы учтутся в расходах по КС-2">Подтвердить</button>
+                    <button style={btnDanger('sm')} onClick={() => deletePurchase(p.id)} data-tooltip="Удалить заявку на закупку">✕</button>
                   </>
                 ) : p.status === 'confirmed' ? (
                   <>
-                    <button style={btnGhost('sm')} onClick={() => openViewModal(p)}>Просмотр</button>
+                    <button style={btnGhost('sm')} onClick={() => openViewModal(p)} data-tooltip="Просмотреть позиции подтверждённой заявки">Просмотр</button>
                   </>
                 ) : (
-                  <button style={btnGhost('sm')} onClick={() => openViewModal(p)}>Просмотр</button>
+                  <button style={btnGhost('sm')} onClick={() => openViewModal(p)} data-tooltip="Просмотреть позиции заявки">Просмотр</button>
                 )}
               </div>
             </div>
@@ -259,8 +259,8 @@ export default function PurchaseRequests({ projectId }: { projectId: string }) {
                 onKeyDown={ev => { if (ev.key === 'Enter' && newTitle.trim()) createPurchase(); }} />
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
-              <button style={btnOutline()} onClick={() => setNewModal(false)}>Отмена</button>
-              <button style={btnPrimary()} onClick={createPurchase} disabled={!newTitle.trim() || savingNew}>
+              <button style={btnOutline()} onClick={() => setNewModal(false)} data-tooltip="Закрыть без создания">Отмена</button>
+              <button style={btnPrimary()} onClick={createPurchase} disabled={!newTitle.trim() || savingNew} data-tooltip="Создать новую заявку на закупку">
                 {savingNew ? 'Создание...' : 'Создать'}
               </button>
             </div>
@@ -276,8 +276,8 @@ export default function PurchaseRequests({ projectId }: { projectId: string }) {
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
-              <button style={tabStyle(itemsTab === 'estimate')} onClick={() => setItemsTab('estimate')}>Из сметы</button>
-              <button style={tabStyle(itemsTab === 'manual')} onClick={() => setItemsTab('manual')}>Вручную</button>
+              <button style={tabStyle(itemsTab === 'estimate')} onClick={() => setItemsTab('estimate')} data-tooltip="Выбрать материалы из сметы проекта">Из сметы</button>
+              <button style={tabStyle(itemsTab === 'manual')} onClick={() => setItemsTab('manual')} data-tooltip="Добавить позиции закупки вручную">Вручную</button>
             </div>
 
             <div style={{ flex: 1, overflow: 'auto' }}>

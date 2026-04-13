@@ -289,7 +289,7 @@ export default function WorkSchedule({ projectId }: { projectId: string }) {
             </button>
           ))}
         </div>
-        <button style={btnOutline('sm')} onClick={scrollToToday}>Сегодня</button>
+        <button style={btnOutline('sm')} onClick={scrollToToday} data-tooltip="Прокрутить календарь к текущей дате">Сегодня</button>
         {/* Date range */}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 12 }}>
           <span style={{ color: C.textSec }}>С</span>
@@ -300,9 +300,9 @@ export default function WorkSchedule({ projectId }: { projectId: string }) {
             style={{ ...INPUT, width: 136, padding: '3px 8px', fontSize: 12 }} />
         </div>
         <div style={{ flex: 1 }} />
-        <button style={btnOutline('sm')} onClick={loadFromEstimates}>Из сметы</button>
-        <button style={btnPrimary('sm')} onClick={openNew}>+ Строка</button>
-        <button style={btnGhost('sm')} onClick={async () => {
+        <button style={btnOutline('sm')} onClick={loadFromEstimates} data-tooltip="Загрузить работы из подписанных смет проекта в ГПР">Из сметы</button>
+        <button style={btnPrimary('sm')} onClick={openNew} data-tooltip="Добавить новую строку в график производства работ">+ Строка</button>
+        <button style={btnGhost('sm')} data-tooltip="Скачать график производства работ в Excel" onClick={async () => {
           const resp = await client.get(`/projects/${projectId}/schedule/export-excel`, { responseType: 'blob' });
           const url = URL.createObjectURL(resp.data);
           const a = document.createElement('a'); a.href = url; a.download = 'gpr.xlsx'; a.click();
@@ -364,19 +364,19 @@ export default function WorkSchedule({ projectId }: { projectId: string }) {
                       <div style={{ display: 'flex', gap: 1, flexShrink: 0 }}>
                         <button
                           style={{ ...btnGhost('sm'), padding: '2px 6px', fontSize: 11, color: C.primary }}
-                          title="Отметить факт выполнения"
+                          data-tooltip="Отметить фактический процент выполнения этой работы"
                           onClick={() => openFact(item)}>
                           %
                         </button>
                         <button
                           style={{ ...btnGhost('sm'), padding: '2px 6px', fontSize: 11 }}
-                          title="Редактировать"
+                          data-tooltip="Редактировать строку графика: название, даты, объём"
                           onClick={() => openEdit(item)}>
                           ✏
                         </button>
                         <button
                           style={{ ...btnDanger('sm'), padding: '2px 6px', fontSize: 11 }}
-                          title="Удалить"
+                          data-tooltip="Удалить строку из графика производства работ"
                           onClick={() => deleteItem(item.id)}>
                           ✕
                         </button>
@@ -502,8 +502,8 @@ export default function WorkSchedule({ projectId }: { projectId: string }) {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
-              <button style={btnOutline()} onClick={() => setItemModal(null)}>Отмена</button>
-              <button style={btnPrimary()} onClick={saveItem} disabled={savingItem || !itemForm.name}>
+              <button style={btnOutline()} onClick={() => setItemModal(null)} data-tooltip="Закрыть без сохранения">Отмена</button>
+              <button style={btnPrimary()} onClick={saveItem} disabled={savingItem || !itemForm.name} data-tooltip="Сохранить строку графика производства работ">
                 {savingItem ? 'Сохранение...' : 'Сохранить'}
               </button>
             </div>
@@ -542,8 +542,8 @@ export default function WorkSchedule({ projectId }: { projectId: string }) {
               />
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'flex-end' }}>
-              <button style={btnOutline()} onClick={() => setFactDialog(null)}>Отмена</button>
-              <button style={btnPrimary()} onClick={saveFact} disabled={savingFact}>
+              <button style={btnOutline()} onClick={() => setFactDialog(null)} data-tooltip="Закрыть без сохранения">Отмена</button>
+              <button style={btnPrimary()} onClick={saveFact} disabled={savingFact} data-tooltip="Сохранить фактический процент выполнения работы">
                 {savingFact ? 'Сохранение...' : 'Сохранить'}
               </button>
             </div>

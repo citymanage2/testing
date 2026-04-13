@@ -84,7 +84,8 @@ export default function DocumentGenerator({ taskId }: { taskId: string }) {
       <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, background: C.surfaceAlt }}>
         {(['estimate', 'ks2', 'ks3'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            style={{ padding: '9px 20px', border: 'none', borderBottom: tab === t ? `2px solid ${C.primary}` : '2px solid transparent', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: tab === t ? 600 : 400, color: tab === t ? C.primary : C.textSec }}>
+            style={{ padding: '9px 20px', border: 'none', borderBottom: tab === t ? `2px solid ${C.primary}` : '2px solid transparent', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: tab === t ? 600 : 400, color: tab === t ? C.primary : C.textSec }}
+            data-tooltip={t === 'estimate' ? 'Сформировать смету в формате Excel с расценками и итогами' : t === 'ks2' ? 'Сформировать форму КС-2 (Акт о приёмке выполненных работ)' : 'Сформировать форму КС-3 (Справка о стоимости выполненных работ)'}>
             {TAB_LABELS[t]}
           </button>
         ))}
@@ -154,7 +155,7 @@ export default function DocumentGenerator({ taskId }: { taskId: string }) {
           </div>
         )}
 
-        <button onClick={generate} disabled={generating} style={{ ...btnPrimary(), marginTop: 14 }}>
+        <button onClick={generate} disabled={generating} style={{ ...btnPrimary(), marginTop: 14 }} data-tooltip="Сформировать документ на основе данных сметы и скачать его на компьютер">
           {generating ? '⏳ Формирование...' : '⬇ Сформировать и скачать'}
         </button>
       </div>
@@ -169,7 +170,7 @@ export default function DocumentGenerator({ taskId }: { taskId: string }) {
                 <span style={{ padding: '1px 7px', background: C.primaryBg, borderRadius: 10, fontSize: 11, color: C.primary }}>{DOC_KIND_LABELS[doc.doc_kind] || doc.doc_kind}</span>
                 <span style={{ fontSize: 12, flex: 1, color: C.text }}>{doc.file_name}</span>
                 <span style={{ fontSize: 11, color: C.textMuted }}>{new Date(doc.created_at).toLocaleDateString('ru-RU')}</span>
-                <button onClick={() => reDownload(doc)} style={btnGhost('sm')}>⬇</button>
+                <button onClick={() => reDownload(doc)} style={btnGhost('sm')} data-tooltip="Скачать ранее сформированный документ повторно">⬇</button>
               </div>
             ))}
           </div>

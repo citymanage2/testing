@@ -116,7 +116,7 @@ export default function WarrantyClaims({ projectId }: { projectId: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button style={btnPrimary('sm')} onClick={openNew}>+ Добавить претензию</button>
+        <button style={btnPrimary('sm')} onClick={openNew} data-tooltip="Добавить новую гарантийную претензию по объекту">+ Добавить претензию</button>
       </div>
 
       {loading ? (
@@ -158,12 +158,13 @@ export default function WarrantyClaims({ projectId }: { projectId: string }) {
                         <button
                           style={btnGhost('sm')}
                           onClick={() => changeStatus(c.id, STATUS_NEXT[c.status]!)}
+                          data-tooltip={`Перевести претензию в статус "${STATUS_LABELS[STATUS_NEXT[c.status]!]}"`}
                         >
                           → {STATUS_LABELS[STATUS_NEXT[c.status]!]}
                         </button>
                       )}
-                      <button style={btnOutline('sm')} onClick={() => openEdit(c)}>Изменить</button>
-                      <button style={btnDanger('sm')} onClick={() => deleteClaim(c.id)}>✕</button>
+                      <button style={btnOutline('sm')} onClick={() => openEdit(c)} data-tooltip="Редактировать данные претензии: заголовок, описание, сроки, ответственного">Изменить</button>
+                      <button style={btnDanger('sm')} onClick={() => deleteClaim(c.id)} data-tooltip="Удалить гарантийную претензию">✕</button>
                     </div>
                   </td>
                 </tr>
@@ -229,11 +230,12 @@ export default function WarrantyClaims({ projectId }: { projectId: string }) {
               </label>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-              <button style={btnOutline()} onClick={() => setModal(null)}>Отмена</button>
+              <button style={btnOutline()} onClick={() => setModal(null)} data-tooltip="Закрыть форму без сохранения">Отмена</button>
               <button
                 style={btnPrimary()}
                 onClick={save}
                 disabled={saving || !form.title.trim()}
+                data-tooltip="Сохранить данные гарантийной претензии"
               >
                 {saving ? 'Сохранение...' : 'Сохранить'}
               </button>

@@ -17,7 +17,8 @@ export default function Admin() {
       <h2 style={{ marginTop: 0 }}>Администрирование</h2>
       <div style={{ display: 'flex', borderBottom: '2px solid #e0e0e0', marginBottom: 24 }}>
         {(['tasks', 'pricelists'] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: '9px 20px', border: 'none', background: 'none', cursor: 'pointer', fontWeight: tab === t ? 700 : 400, color: tab === t ? '#1565c0' : '#555', borderBottom: tab === t ? '2px solid #1565c0' : '2px solid transparent', marginBottom: -2, fontSize: 14 }}>
+          <button key={t} onClick={() => setTab(t)} style={{ padding: '9px 20px', border: 'none', background: 'none', cursor: 'pointer', fontWeight: tab === t ? 700 : 400, color: tab === t ? '#1565c0' : '#555', borderBottom: tab === t ? '2px solid #1565c0' : '2px solid transparent', marginBottom: -2, fontSize: 14 }}
+            data-tooltip={t === 'tasks' ? 'Просмотр и управление всеми задачами ИИ в системе' : 'Управление прайс-листами на работы и материалы для поиска цен'}>
             {t === 'tasks' ? 'Задачи' : 'Прайс-листы'}
           </button>
         ))}
@@ -70,7 +71,7 @@ function TasksTab() {
         </div>
         <div><label style={lbl}>От</label><input type="date" value={filters.date_from} onChange={(e) => setFilters((f) => ({ ...f, date_from: e.target.value }))} style={inp} /></div>
         <div><label style={lbl}>До</label><input type="date" value={filters.date_to} onChange={(e) => setFilters((f) => ({ ...f, date_to: e.target.value }))} style={inp} /></div>
-        <button type="submit" style={{ padding: '7px 16px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Применить</button>
+        <button type="submit" style={{ padding: '7px 16px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }} data-tooltip="Применить выбранные фильтры к списку задач">Применить</button>
       </form>
 
       {loading && <p style={{ color: '#aaa' }}>Загрузка...</p>}
@@ -89,9 +90,9 @@ function TasksTab() {
                   <td style={tdS}>{t.status}</td>
                   <td style={tdS}>{new Date(t.created_at).toLocaleString('ru-RU')}</td>
                   <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
-                    <button onClick={async () => setDetail((await client.get<Record<string, unknown>>(`/admin/tasks/${t.id}`)).data)} style={aBtn('#1565c0')}>Детали</button>
-                    <a href={`${API_BASE}/admin/tasks/${t.id}/download-input/0`} target="_blank" rel="noreferrer" style={{ ...aBtn('#4caf50'), marginLeft: 6, textDecoration: 'none', display: 'inline-block' }}>Скачать</a>
-                    <button onClick={async () => { if (confirm(`Удалить ${t.id}?`)) { await client.delete(`/admin/tasks/${t.id}`); load(page); } }} style={{ ...aBtn('#f44336'), marginLeft: 6 }}>Удалить</button>
+                    <button onClick={async () => setDetail((await client.get<Record<string, unknown>>(`/admin/tasks/${t.id}`)).data)} style={aBtn('#1565c0')} data-tooltip="Просмотреть подробную информацию о задаче: параметры, файлы, статусы">Детали</button>
+                    <a href={`${API_BASE}/admin/tasks/${t.id}/download-input/0`} target="_blank" rel="noreferrer" style={{ ...aBtn('#4caf50'), marginLeft: 6, textDecoration: 'none', display: 'inline-block' }} data-tooltip="Скачать входящий файл задачи">Скачать</a>
+                    <button onClick={async () => { if (confirm(`Удалить ${t.id}?`)) { await client.delete(`/admin/tasks/${t.id}`); load(page); } }} style={{ ...aBtn('#f44336'), marginLeft: 6 }} data-tooltip="Удалить задачу и все её данные из системы (необратимо)">Удалить</button>
                   </td>
                 </tr>
               ))}
@@ -99,9 +100,9 @@ function TasksTab() {
           </table>
           {totalPages > 1 && (
             <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' }}>
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={aBtn('#757575')}>←</button>
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={aBtn('#757575')} data-tooltip="Перейти на предыдущую страницу">←</button>
               <span>Стр. {page} / {totalPages}</span>
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={aBtn('#757575')}>→</button>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={aBtn('#757575')} data-tooltip="Перейти на следующую страницу">→</button>
             </div>
           )}
         </>
@@ -112,7 +113,7 @@ function TasksTab() {
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 8, padding: 24, maxWidth: 600, width: '90%', maxHeight: '80vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
               <h3 style={{ margin: 0 }}>Детали задачи</h3>
-              <button onClick={() => setDetail(null)} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer' }}>×</button>
+              <button onClick={() => setDetail(null)} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer' }} data-tooltip="Закрыть окно деталей задачи">×</button>
             </div>
             <pre style={{ fontSize: 13, whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0 }}>{JSON.stringify(detail, null, 2)}</pre>
           </div>
@@ -155,7 +156,7 @@ function PriceListsTab() {
             <h3 style={{ margin: '0 0 8px' }}>{label}</h3>
             {item ? <p style={{ margin: '0 0 10px', fontSize: 14, color: '#555' }}><strong>{item.filename}</strong> — {new Date(item.updated_at).toLocaleString('ru-RU')}</p>
               : <p style={{ margin: '0 0 10px', fontSize: 14, color: '#aaa' }}>Файл не загружен</p>}
-            <button onClick={() => ref.current?.click()} style={{ padding: '7px 16px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Загрузить XLSX</button>
+            <button onClick={() => ref.current?.click()} style={{ padding: '7px 16px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }} data-tooltip={`Загрузить новый ${label.toLowerCase()} из файла XLSX (заменит текущий)`}>Загрузить XLSX</button>
             <input ref={ref} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(type, f); e.target.value = ''; }} />
           </div>
         );
