@@ -41,7 +41,10 @@ async def _check_estimate_editable(task: Task, db: AsyncSession) -> Optional[str
     """Returns error message if estimate is not editable, None if OK."""
     if task.estimate_status in LOCKED_ESTIMATE_STATUSES:
         return "Смета подписана и не может быть изменена"
-    # Check project stage
+    # Subcontractor estimates remain editable regardless of project stage
+    if getattr(task, "estimate_type", None) == "subcontractor":
+        return None
+    # Check project stage for non-subcontractor estimates
     if task.project_id:
         from app.models.project import Project
         project = await db.get(Project, task.project_id)
