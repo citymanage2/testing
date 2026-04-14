@@ -5,10 +5,15 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 TASK_TYPES = [
+    # ВОР (bill of quantities)
     "LIST_FROM_TZ", "LIST_FROM_TZ_PROJECT", "LIST_FROM_PROJECT",
-    "RESEARCH_PROJECT", "SMETA_FROM_LIST", "SMETA_FROM_TZ",
-    "SMETA_FROM_TZ_PROJECT", "SMETA_FROM_PROJECT", "SMETA_FROM_EDC_PROJECT",
-    "SMETA_FROM_GRAND_PROJECT", "SCAN_TO_EXCEL", "COMPARE_PROJECT_SMETA", "IMPORT_EXCEL",
+    # Сметы
+    "SMETA_FROM_LIST", "SMETA_FROM_TZ",
+    "SMETA_FROM_TZ_PROJECT", "SMETA_FROM_PROJECT",
+    # Специальные
+    "SCAN_TO_EXCEL", "COMPARE_PROJECT_SMETA",
+    # Внутренний тип — ручное создание, пользователь не выбирает
+    "IMPORT_EXCEL",
 ]
 
 ALLOWED_MIME_TYPES = {

@@ -4,16 +4,16 @@ import client from '../api/client';
 import FileUpload from '../components/FileUpload';
 
 const TASK_TYPES = [
-  { value: 'LIST_FROM_TZ', label: 'Перечень из ТЗ' },
-  { value: 'LIST_FROM_TZ_PROJECT', label: 'Перечень из ТЗ + проект' },
-  { value: 'LIST_FROM_PROJECT', label: 'Перечень из проекта' },
-  { value: 'RESEARCH_PROJECT', label: 'Исследование проекта' },
-  { value: 'SMETA_FROM_LIST', label: 'Смета из перечня' },
+  // ВОР
+  { value: 'LIST_FROM_TZ', label: 'ВОР из ТЗ' },
+  { value: 'LIST_FROM_TZ_PROJECT', label: 'ВОР из ТЗ + Проект' },
+  { value: 'LIST_FROM_PROJECT', label: 'ВОР из проекта' },
+  // Сметы
+  { value: 'SMETA_FROM_LIST', label: 'Смета из ВОР' },
   { value: 'SMETA_FROM_TZ', label: 'Смета из ТЗ' },
-  { value: 'SMETA_FROM_TZ_PROJECT', label: 'Смета из ТЗ + проект' },
+  { value: 'SMETA_FROM_TZ_PROJECT', label: 'Смета из ТЗ + Проект' },
   { value: 'SMETA_FROM_PROJECT', label: 'Смета из проекта' },
-  { value: 'SMETA_FROM_EDC_PROJECT', label: 'Смета из EDC + проект' },
-  { value: 'SMETA_FROM_GRAND_PROJECT', label: 'Смета из Grand CAD + проект' },
+  // Специальные
   { value: 'SCAN_TO_EXCEL', label: 'Скан → Excel' },
   { value: 'COMPARE_PROJECT_SMETA', label: 'Сравнение проекта со сметой' },
 ];

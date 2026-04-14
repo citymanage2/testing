@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import String, Text, JSON, ForeignKey, Numeric
+from sqlalchemy import String, Text, JSON, ForeignKey, Numeric, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -27,3 +27,11 @@ class EstimateItem(Base):
     sort_order: Mapped[float] = mapped_column(default=0.0)
     sale_price: Mapped[float] = mapped_column(default=0.0)
     position_code: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    # ТЗ v1.0: price provenance and cross-source tracking (schema 3.1)
+    is_estimated: Mapped[bool] = mapped_column(Boolean, default=False)
+    source: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    qty_from_tz: Mapped[Optional[float]] = mapped_column(nullable=True)
+    qty_from_project: Mapped[Optional[float]] = mapped_column(nullable=True)
+    discrepancy: Mapped[bool] = mapped_column(Boolean, default=False)
+    scan_math_error: Mapped[bool] = mapped_column(Boolean, default=False)
