@@ -208,6 +208,66 @@ async def update_task_doc_type(
     return {"ok": True}
 
 
+@router.get("/{task_id}/sub-distribution")
+async def get_sub_distribution(
+    task_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return per-item distribution across existing subcontractor estimates linked to task_id."""
+    from app.models.estimate_item import EstimateItem
+
+    source_task = await db.get(Task, task_id)
+    if not source_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if source_task.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Get source items
+    items_result = await db.execute(
+        select(EstimateItem).where(EstimateItem.task_id == task_id).order_by(EstimateItem.sort_order)
+    )
+    source_items = [i for i in items_result.scalars().all() if i.row_type != 'section_header']
+
+    # Get all subcontractor tasks linked to this parent
+    sub_tasks_result = await db.execute(
+        select(Task).where(
+            Task.parent_estimate_id == task_id,
+            Task.estimate_type == "subcontractor",
+            Task.user_id == current_user.id,
+        )
+    )
+    sub_task_ids = [t.id for t in sub_tasks_result.scalars().all()]
+
+    # Collect quantities from all sub-estimates, matched by item name
+    distributed_by_name: dict[str, float] = {}
+    if sub_task_ids:
+        sub_items_result = await db.execute(
+            select(EstimateItem).where(EstimateItem.task_id.in_(sub_task_ids))
+        )
+        for si in sub_items_result.scalars().all():
+            if si.row_type == 'section_header':
+                continue
+            distributed_by_name[si.name] = distributed_by_name.get(si.name, 0.0) + (si.quantity or 0.0)
+
+    result = []
+    for item in source_items:
+        total = item.quantity or 0.0
+        distributed = distributed_by_name.get(item.name, 0.0)
+        remaining = max(0.0, total - distributed)
+        result.append({
+            "item_id": item.id,
+            "name": item.name,
+            "unit": item.unit,
+            "type": item.type,
+            "section": item.section,
+            "quantity_total": total,
+            "quantity_distributed": distributed,
+            "quantity_remaining": remaining,
+        })
+    return result
+
+
 @router.post("/{task_id}/copy-as-subcontractor", status_code=201)
 async def copy_task_as_subcontractor(
     task_id: str,
@@ -228,6 +288,7 @@ async def copy_task_as_subcontractor(
 
     include_materials = body.get("include_materials", True)
     item_ids_filter = body.get("item_ids")  # None = copy all; list = copy only these IDs
+    item_quantities: dict[str, float] = body.get("item_quantities") or {}  # item_id -> override quantity
     new_name = body.get("name") or f"{source_task.name or 'Смета'} (субподряд)"
 
     new_task = Task(
@@ -257,6 +318,13 @@ async def copy_task_as_subcontractor(
             continue
         if item_ids_set is not None and item.id not in item_ids_set:
             continue
+        override_qty = item_quantities.get(item.id)
+        use_quantity = override_qty if override_qty is not None else item.quantity
+        if override_qty is not None and item.quantity and item.quantity != 0:
+            ratio = use_quantity / item.quantity
+            use_total = (item.total or 0) * ratio
+        else:
+            use_total = item.total
         new_item = EstimateItem(
             id=str(uuid.uuid4()),
             task_id=new_task.id,
@@ -265,10 +333,10 @@ async def copy_task_as_subcontractor(
             type=item.type,
             name=item.name,
             unit=item.unit,
-            quantity=item.quantity,
+            quantity=use_quantity,
             work_price=item.work_price,
             mat_price=item.mat_price,
-            total=item.total,
+            total=use_total,
             is_analogue=item.is_analogue,
             is_optimized=item.is_optimized,
             source_url=item.source_url,

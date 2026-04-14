@@ -73,6 +73,8 @@ export default function ProjectDetail() {
   const [subSourceItems, setSubSourceItems] = useState<{id: string; name: string; type: string; section: string; unit: string; quantity: number}[]>([]);
   const [subSelectedIds, setSubSelectedIds] = useState<Set<string>>(new Set());
   const [loadingSubItems, setLoadingSubItems] = useState(false);
+  const [subDistribution, setSubDistribution] = useState<Record<string, {distributed: number; remaining: number; total: number}>>({});
+  const [subItemQuantities, setSubItemQuantities] = useState<Record<string, string>>({});
   const [estimatesWithTotals, setEstimatesWithTotals] = useState<EstimateWithTotal[]>([]);
   const [showNewClientForm, setShowNewClientForm] = useState(false);
   const [newClientName, setNewClientName] = useState('');
@@ -110,14 +112,39 @@ export default function ProjectDetail() {
   useEffect(() => { loadAll(); }, [id]);
 
   useEffect(() => {
-    if (!subModalForm.sourceTaskId) { setSubSourceItems([]); setSubSelectedIds(new Set()); return; }
+    if (!subModalForm.sourceTaskId) {
+      setSubSourceItems([]); setSubSelectedIds(new Set());
+      setSubDistribution({}); setSubItemQuantities({});
+      return;
+    }
     setLoadingSubItems(true);
-    client.get<{ items: {id: string; name: string; type: string; section: string; unit: string; quantity: number; row_type?: string}[] }>(
-      `/projects/estimates/${subModalForm.sourceTaskId}/items`
-    ).then(r => {
-      const items = r.data.items.filter(i => i.row_type !== 'section_header');
+    Promise.all([
+      client.get<{ items: {id: string; name: string; type: string; section: string; unit: string; quantity: number; row_type?: string}[] }>(
+        `/projects/estimates/${subModalForm.sourceTaskId}/items`
+      ),
+      client.get<{item_id: string; quantity_total: number; quantity_distributed: number; quantity_remaining: number}[]>(
+        `/tasks/${subModalForm.sourceTaskId}/sub-distribution`
+      ).catch(() => ({ data: [] })),
+    ]).then(([itemsResp, distResp]) => {
+      const items = itemsResp.data.items.filter(i => i.row_type !== 'section_header');
       setSubSourceItems(items);
       setSubSelectedIds(new Set(items.map(i => i.id)));
+
+      const distMap: Record<string, {distributed: number; remaining: number; total: number}> = {};
+      const qtyMap: Record<string, string> = {};
+      for (const d of distResp.data) {
+        distMap[d.item_id] = { distributed: d.quantity_distributed, remaining: d.quantity_remaining, total: d.quantity_total };
+        qtyMap[d.item_id] = String(d.quantity_remaining > 0 ? d.quantity_remaining : d.quantity_total);
+      }
+      // fallback for items not in distribution (no sub-estimates yet)
+      items.forEach(item => {
+        if (!distMap[item.id]) {
+          distMap[item.id] = { distributed: 0, remaining: item.quantity, total: item.quantity };
+          qtyMap[item.id] = String(item.quantity);
+        }
+      });
+      setSubDistribution(distMap);
+      setSubItemQuantities(qtyMap);
     }).catch(() => {}).finally(() => setLoadingSubItems(false));
   }, [subModalForm.sourceTaskId]);
 
@@ -713,41 +740,72 @@ export default function ProjectDetail() {
                     )}
                   </div>
                   {!loadingSubItems && subSourceItems.length > 0 && (
-                    <div style={{ border: `1px solid ${C.border}`, borderRadius: 6, maxHeight: 280, overflowY: 'auto' }}>
-                      {(() => {
-                        const rows: React.ReactNode[] = [];
-                        let lastSection = '';
-                        subSourceItems.forEach(item => {
-                          const sec = item.section || '— без раздела —';
-                          if (sec !== lastSection) {
-                            lastSection = sec;
+                    <>
+                      {Object.values(subDistribution).some(d => d.distributed > 0) && (
+                        <div style={{ padding: '6px 10px', background: '#fffbeb', border: `1px solid #fcd34d`, borderRadius: 6, fontSize: 12, color: '#92400e', marginBottom: 6 }}>
+                          Показаны остатки объёмов, не распределённых другим подрядчикам. Вы можете изменить количество вручную.
+                        </div>
+                      )}
+                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 6, maxHeight: 320, overflowY: 'auto' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr auto 90px', gap: 0, padding: '4px 10px', background: C.surfaceAlt, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textSec }}>
+                          <span/>
+                          <span>Позиция</span>
+                          <span style={{ textAlign: 'right', paddingRight: 8 }}>Распределено</span>
+                          <span style={{ textAlign: 'center' }}>Кол-во</span>
+                        </div>
+                        {(() => {
+                          const rows: React.ReactNode[] = [];
+                          let lastSection = '';
+                          subSourceItems.forEach(item => {
+                            const sec = item.section || '— без раздела —';
+                            if (sec !== lastSection) {
+                              lastSection = sec;
+                              rows.push(
+                                <div key={`sec-${sec}`} style={{ gridColumn: '1 / -1', padding: '4px 10px', background: C.surfaceAlt, fontSize: 11, fontWeight: 700, color: C.textSec, borderBottom: `1px solid ${C.border}` }}>
+                                  {sec}
+                                </div>
+                              );
+                            }
+                            const dist = subDistribution[item.id];
+                            const fullyDistributed = dist && dist.distributed >= dist.total && dist.total > 0;
                             rows.push(
-                              <div key={`sec-${sec}`} style={{ padding: '5px 10px', background: C.surfaceAlt, fontSize: 11, fontWeight: 700, color: C.textSec, borderBottom: `1px solid ${C.border}` }}>
-                                {sec}
+                              <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '20px 1fr auto 90px', alignItems: 'center', gap: 0, padding: '5px 10px', borderBottom: `1px solid ${C.border}`, background: fullyDistributed ? '#fef9f0' : 'transparent' }}>
+                                <input type="checkbox" checked={subSelectedIds.has(item.id)}
+                                  onChange={e => {
+                                    const next = new Set(subSelectedIds);
+                                    if (e.target.checked) next.add(item.id); else next.delete(item.id);
+                                    setSubSelectedIds(next);
+                                  }} style={{ marginTop: 1 }} />
+                                <div style={{ minWidth: 0 }}>
+                                  <span style={{ fontWeight: 500, color: C.text, fontSize: 12 }}>{item.name}</span>
+                                  <span style={{ marginLeft: 6, fontSize: 10, color: item.type === 'Работа' ? '#1d4ed8' : '#065f46', background: item.type === 'Работа' ? '#dbeafe' : '#d1fae5', padding: '1px 4px', borderRadius: 3 }}>
+                                    {item.type === 'Работа' ? 'Р' : 'М'}
+                                  </span>
+                                  {dist && dist.distributed > 0 && (
+                                    <span style={{ marginLeft: 6, fontSize: 10, color: C.textMuted }}>{item.unit}</span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: 11, color: C.textMuted, paddingRight: 8, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                  {dist && dist.distributed > 0
+                                    ? <span style={{ color: fullyDistributed ? C.danger : '#d97706' }}>{dist.distributed}/{dist.total}</span>
+                                    : <span style={{ color: C.textMuted }}>{item.quantity} {item.unit}</span>}
+                                </div>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={subItemQuantities[item.id] ?? String(item.quantity)}
+                                  onChange={e => setSubItemQuantities(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                  disabled={!subSelectedIds.has(item.id)}
+                                  style={{ ...INPUT, padding: '2px 6px', fontSize: 12, width: '100%', opacity: subSelectedIds.has(item.id) ? 1 : 0.4, textAlign: 'right' }}
+                                />
                               </div>
                             );
-                          }
-                          rows.push(
-                            <label key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 10px', cursor: 'pointer', fontSize: 13, borderBottom: `1px solid ${C.border}` }}>
-                              <input type="checkbox" checked={subSelectedIds.has(item.id)}
-                                onChange={e => {
-                                  const next = new Set(subSelectedIds);
-                                  if (e.target.checked) next.add(item.id); else next.delete(item.id);
-                                  setSubSelectedIds(next);
-                                }} style={{ marginTop: 2 }} />
-                              <div>
-                                <span style={{ fontWeight: 500, color: C.text }}>{item.name}</span>
-                                <span style={{ marginLeft: 6, fontSize: 11, color: item.type === 'Работа' ? '#1d4ed8' : '#065f46', background: item.type === 'Работа' ? '#dbeafe' : '#d1fae5', padding: '1px 5px', borderRadius: 4 }}>
-                                  {item.type === 'Работа' ? 'Р' : 'М'}
-                                </span>
-                                <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 6 }}>{item.quantity} {item.unit}</span>
-                              </div>
-                            </label>
-                          );
-                        });
-                        return rows;
-                      })()}
-                    </div>
+                          });
+                          return rows;
+                        })()}
+                      </div>
+                    </>
                   )}
                 </div>
               )}
@@ -765,9 +823,23 @@ export default function ProjectDetail() {
                   let newTaskId: string;
                   if (subModalForm.sourceTaskId) {
                     const allSelected = subSelectedIds.size === subSourceItems.length;
+                    const selectedIds = Array.from(subSelectedIds);
+                    // Build quantities map only for items with custom (non-total) quantities
+                    const item_quantities: Record<string, number> = {};
+                    selectedIds.forEach(itemId => {
+                      const orig = subSourceItems.find(i => i.id === itemId);
+                      const qtyStr = subItemQuantities[itemId];
+                      if (orig && qtyStr !== undefined) {
+                        const qty = parseFloat(qtyStr);
+                        if (!isNaN(qty) && qty !== orig.quantity) {
+                          item_quantities[itemId] = qty;
+                        }
+                      }
+                    });
                     const r = await client.post(`/tasks/${subModalForm.sourceTaskId}/copy-as-subcontractor`, {
                       name: subModalForm.name || undefined,
-                      item_ids: allSelected ? undefined : Array.from(subSelectedIds),
+                      item_ids: allSelected ? undefined : selectedIds,
+                      item_quantities: Object.keys(item_quantities).length > 0 ? item_quantities : undefined,
                       parent_estimate_id: subParentId || subModalForm.sourceTaskId || undefined,
                     });
                     newTaskId = r.data.task_id;

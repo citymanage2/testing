@@ -503,19 +503,23 @@ export default function EstimateView() {
                 {DOC_TYPES.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
               {/* Calculation method badge */}
-              <div style={{ display: 'flex', gap: 3, border: `1px solid ${C.border}`, borderRadius: 6, overflow: 'hidden' }}>
-                {[
-                  { val: null, label: '—' },
-                  { val: 'manual', label: 'Вручную' },
-                  { val: 'ai', label: 'ИИ' },
-                ].map(({ val, label }) => (
-                  <button key={String(val)} onClick={() => saveCalculationMethod(val)}
-                    style={{ padding: '3px 8px', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: calculationMethod === val ? 700 : 400,
-                      background: calculationMethod === val ? (val === 'ai' ? '#7c3aed22' : val === 'manual' ? C.surfaceAlt : C.surface) : 'transparent',
-                      color: calculationMethod === val ? (val === 'ai' ? '#7c3aed' : C.text) : C.textMuted }}>
-                    {label}
-                  </button>
-                ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: 'nowrap' }}>Метод расчёта:</span>
+                <div style={{ display: 'flex', gap: 3, border: `1px solid ${C.border}`, borderRadius: 6, overflow: 'hidden' }}>
+                  {[
+                    { val: null, label: '—', tip: 'Метод расчёта не указан' },
+                    { val: 'manual', label: 'Вручную', tip: 'Смета заполнена вручную без участия ИИ' },
+                    { val: 'ai', label: 'ИИ', tip: 'Смета сформирована с помощью искусственного интеллекта' },
+                  ].map(({ val, label, tip }) => (
+                    <button key={String(val)} onClick={() => saveCalculationMethod(val)}
+                      data-tooltip={tip}
+                      style={{ padding: '3px 8px', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: calculationMethod === val ? 700 : 400,
+                        background: calculationMethod === val ? (val === 'ai' ? '#7c3aed22' : val === 'manual' ? C.surfaceAlt : C.surface) : 'transparent',
+                        color: calculationMethod === val ? (val === 'ai' ? '#7c3aed' : C.text) : C.textMuted }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
