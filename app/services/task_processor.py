@@ -376,6 +376,11 @@ def _compute_diff(smeta_items: list[dict], project_items: list[VorItem]) -> dict
 
 class TaskProcessor:
 
+    @staticmethod
+    def _prog(db_task, percent: int, label: str, detail: str = ""):
+        """Set structured progress_message: 'PERCENT|LABEL|DETAIL'."""
+        db_task.progress_message = f"{percent}|{label}|{detail}"
+
     async def process(self, task_id: str):
         async with SessionLocal() as db:
             task = await db.get(Task, task_id)
@@ -383,7 +388,7 @@ class TaskProcessor:
                 return
 
             task.status = "processing"
-            task.progress_message = "Загрузка файлов..."
+            self._prog(task, 5, "Загрузка файлов", "Чтение входных документов...")
             task.error_message = None
             await db.commit()
 
@@ -397,7 +402,7 @@ class TaskProcessor:
                 system   = TASK_SYSTEMS.get(task.task_type, TASK_SYSTEMS["SMETA_FROM_TZ"])
                 model    = TASK_MODELS.get(task.task_type, SONNET)
 
-                task.progress_message = "Обработка документов через Claude AI..."
+                self._prog(task, 20, "Подготовка запроса", "Формирование контекста для Claude...")
                 await db.commit()
 
                 if task.task_type in SMETA_TYPES:
@@ -407,11 +412,10 @@ class TaskProcessor:
                 elif task.task_type == "COMPARE_PROJECT_SMETA":
                     await self._process_compare(db, task, input_files, model)
                 else:
-                    # Fallback: unknown type treated as smeta
                     await self._process_smeta(db, task, system, messages, model)
 
                 task.status = "completed"
-                task.progress_message = "Готово"
+                self._prog(task, 100, "Готово", "Задача выполнена успешно")
                 task.estimate_status = "calculated"
                 await db.commit()
 
@@ -479,19 +483,21 @@ class TaskProcessor:
     # ------------------------------------------------------------------
 
     async def _process_vor(self, db, task: Task, system: str, messages: list, model: str):
-        task.progress_message = "Формирование ВОР..."
+        self._prog(task, 30, "Анализ документов", "Claude читает входные файлы...")
         await db.commit()
 
         vor_response = await self._call_claude_with_retry(system, messages, model)
 
-        # Deduplicate
+        self._prog(task, 70, "Валидация и дедупликация", "Проверка схемы, удаление дублей...")
+        await db.commit()
+
         all_items = vor_response.all_items()
         all_items = _deduplicate_items(all_items)
 
         if not all_items:
             raise ValueError("Claude не вернул ни одной позиции — проверь входные файлы")
 
-        task.progress_message = "Сохранение позиций..."
+        self._prog(task, 82, "Сохранение позиций", "Запись в базу данных...")
         await db.commit()
 
         # Clear old items
@@ -529,7 +535,7 @@ class TaskProcessor:
 
         await db.flush()
 
-        task.progress_message = "Генерация Excel (ВОР)..."
+        self._prog(task, 92, "Генерация Excel", "Формирование vor.xlsx...")
         await db.commit()
 
         items_result = await db.execute(
@@ -561,10 +567,14 @@ class TaskProcessor:
     # ------------------------------------------------------------------
 
     async def _process_smeta(self, db, task: Task, system: str, messages: list, model: str):
-        task.progress_message = "Формирование сметы..."
+        self._prog(task, 30, "Анализ документов", "Claude читает входные файлы и составляет позиции...")
         await db.commit()
 
         vor_response = await self._call_claude_with_retry(system, messages, model)
+
+        self._prog(task, 60, "Валидация и дедупликация", "Проверка схемы, удаление дублей...")
+        await db.commit()
+
         all_items = vor_response.all_items()
         all_items = _deduplicate_items(all_items)
 
@@ -572,7 +582,7 @@ class TaskProcessor:
         if not valid_items:
             raise ValueError("Claude не вернул ни одной позиции в смете — проверь входные файлы")
 
-        task.progress_message = "Обогащение ценами..."
+        self._prog(task, 72, "Обогащение ценами", "Поиск в кэше цен, уточнение у Claude...")
         await db.commit()
 
         # Enrich prices (3-tier)
@@ -631,7 +641,10 @@ class TaskProcessor:
 
         await db.flush()
 
-        task.progress_message = "Генерация файлов..."
+        self._prog(task, 85, "Сохранение позиций", "Запись сметы в базу данных...")
+        await db.commit()
+
+        self._prog(task, 93, "Генерация Excel", "Формирование smeta.xlsx...")
         await db.commit()
 
         await snapshot_service.save_snapshot(db, task.id, "initial", "Первичная смета")
@@ -662,18 +675,15 @@ class TaskProcessor:
         Step 3: Code computes diff.
         Step 4: Claude writes analytics commentary on the diff only.
         """
-        task.progress_message = "Извлечение сметы..."
+        self._prog(task, 20, "Извлечение сметы", "Парсинг машиночитаемого файла...")
         await db.commit()
 
-        # Split files: assume first file = smeta, second = project
         smeta_file   = input_files[0] if input_files else None
         project_file = input_files[1] if len(input_files) > 1 else None
 
-        # Step 1: extract smeta items from machine-readable file
         smeta_items = self._extract_smeta_items(smeta_file)
 
-        # Step 2: Claude extracts project positions
-        task.progress_message = "Анализ проектной документации..."
+        self._prog(task, 40, "Анализ проекта", "Claude извлекает позиции из проектной документации...")
         await db.commit()
 
         if project_file:
@@ -689,14 +699,12 @@ class TaskProcessor:
         else:
             project_items = []
 
-        # Step 3: code computes diff
-        task.progress_message = "Вычисление расхождений..."
+        self._prog(task, 65, "Вычисление расхождений", "Сравнение списков (fuzzy match 85%)...")
         await db.commit()
 
         diff = _compute_diff(smeta_items, project_items)
 
-        # Step 4: Claude comments on diff only (not on full documents again)
-        task.progress_message = "Аналитический комментарий..."
+        self._prog(task, 80, "Аналитический комментарий", "Claude анализирует расхождения...")
         await db.commit()
 
         diff_summary = (
@@ -716,6 +724,9 @@ class TaskProcessor:
         task.chat_history = list(task.chat_history or []) + [
             {"role": "assistant", "content": analytics_text}
         ]
+
+        self._prog(task, 93, "Генерация отчёта", "Формирование comparison.xlsx...")
+        await db.commit()
 
         excel_data = build_compare_excel(diff, analytics_text)
         db.add(TaskResult(

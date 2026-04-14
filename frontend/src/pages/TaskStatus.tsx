@@ -7,8 +7,19 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 interface TaskData {
   id: string; task_type: string; status: string; estimate_status: string | null;
-  created_at: string; error_message?: string | null;
+  created_at: string; error_message?: string | null; progress_message?: string | null;
   messages?: Array<{ role: string; content: string; created_at: string }>;
+}
+
+interface Progress { percent: number; label: string; detail: string; }
+
+function parseProgress(raw: string | null | undefined): Progress | null {
+  if (!raw) return null;
+  const parts = raw.split('|');
+  if (parts.length < 2) return null;
+  const percent = parseInt(parts[0], 10);
+  if (isNaN(percent)) return null;
+  return { percent, label: parts[1] ?? '', detail: parts[2] ?? '' };
 }
 interface ResultFile { id: number; file_name: string; mime_type: string; }
 
@@ -76,6 +87,7 @@ export default function TaskStatus() {
 
   if (!task) return <div style={{ padding: 24 }}>Загрузка...</div>;
   const isActive = ['pending', 'processing'].includes(task.status);
+  const progress = parseProgress(task.progress_message);
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
@@ -85,6 +97,9 @@ export default function TaskStatus() {
       </div>
       <p style={{ margin: '0 0 4px', color: '#555' }}><strong>Тип:</strong> {task.task_type}</p>
       <p style={{ margin: '0 0 16px', color: '#555' }}><strong>Создана:</strong> {new Date(task.created_at).toLocaleString('ru-RU')}</p>
+
+      {isActive && progress && <ProgressBar progress={progress} />}
+
       {task.error_message && <p style={{ color: '#f44336' }}><strong>Ошибка:</strong> {task.error_message}</p>}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -138,4 +153,26 @@ export default function TaskStatus() {
 
 function btn(bg: string): React.CSSProperties {
   return { padding: '7px 14px', background: bg, color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13, fontWeight: 500 };
+}
+
+function ProgressBar({ progress }: { progress: Progress }) {
+  const { percent, label, detail } = progress;
+  return (
+    <div style={{ marginBottom: 24, padding: '16px 20px', background: '#f0f4ff', borderRadius: 8, border: '1px solid #c5cfe8' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+        <span style={{ fontWeight: 600, fontSize: 15, color: '#1a237e' }}>{label}</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: '#1565c0' }}>{percent}%</span>
+      </div>
+      <div style={{ background: '#d0d9f0', borderRadius: 6, height: 10, overflow: 'hidden', marginBottom: detail ? 8 : 0 }}>
+        <div style={{
+          height: '100%',
+          width: `${percent}%`,
+          background: percent === 100 ? '#4caf50' : 'linear-gradient(90deg, #1565c0, #42a5f5)',
+          borderRadius: 6,
+          transition: 'width 0.5s ease',
+        }} />
+      </div>
+      {detail && <span style={{ fontSize: 13, color: '#546e7a' }}>{detail}</span>}
+    </div>
+  );
 }
