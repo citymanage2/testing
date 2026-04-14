@@ -6,8 +6,8 @@ Claude MUST return strict JSON (no markdown wrappers).
 Arithmetic (totals, VAT, etc.) is computed by code, never by Claude.
 """
 from __future__ import annotations
-from typing import Literal, Optional
-from pydantic import BaseModel, Field, model_validator
+from typing import Any, Literal, Optional
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class VorItem(BaseModel):
@@ -88,6 +88,33 @@ class ClaudeVorResponse(BaseModel):
         default_factory=list,
         description="Textual descriptions of found discrepancies (modules 2.2, 2.9)",
     )
+
+    @field_validator("discrepancies", mode="before")
+    @classmethod
+    def _coerce_discrepancies(cls, v: Any) -> list[str]:
+        """
+        Claude sometimes returns discrepancies as list of dicts instead of strings.
+        Normalise any item to a string regardless of its shape.
+        """
+        if not isinstance(v, list):
+            return []
+        result = []
+        for item in v:
+            if isinstance(item, str):
+                result.append(item)
+            elif isinstance(item, dict):
+                # Try common keys Claude uses, fall back to full repr
+                text = (
+                    item.get("description")
+                    or item.get("text")
+                    or item.get("message")
+                    or item.get("detail")
+                    or str(item)
+                )
+                result.append(str(text))
+            else:
+                result.append(str(item))
+        return result
 
     # Computed by code after parsing — Claude leaves these at defaults
     class Meta(BaseModel):
