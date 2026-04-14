@@ -25,6 +25,10 @@ MAX_TOKENS_SMETA = 32000  # Estimates can be large — use higher limit
 
 
 async def complete(system: str, messages: list[dict], max_tokens: int = MAX_TOKENS, model: str = MODEL) -> str:
+    """
+    Call Claude and return the full text response.
+    Uses streaming to avoid the 10-minute timeout on long requests.
+    """
     import asyncio
     from anthropic import APIStatusError, APIConnectionError, APITimeoutError
 
@@ -32,10 +36,16 @@ async def complete(system: str, messages: list[dict], max_tokens: int = MAX_TOKE
 
     for attempt in range(5):
         try:
-            response = await client.messages.create(
-                model=model, max_tokens=max_tokens, system=system, messages=messages,
-            )
-            return response.content[0].text
+            chunks: list[str] = []
+            async with client.messages.stream(
+                model=model,
+                max_tokens=max_tokens,
+                system=system,
+                messages=messages,
+            ) as stream:
+                async for text in stream.text_stream:
+                    chunks.append(text)
+            return "".join(chunks)
         except APIStatusError as e:
             if e.status_code in _RETRYABLE_STATUS and attempt < 4:
                 await asyncio.sleep(2 ** attempt)
