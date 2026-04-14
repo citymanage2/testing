@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.auth import get_current_user, CurrentUser
+from app.auth import get_current_user, CurrentUser, is_admin, owns_or_admin
 from app.database import get_db
 from app.models.task import Task
 from app.models.project import Project
@@ -64,14 +64,17 @@ async def create_project(body: ProjectCreate, current_user: CurrentUser, db: Asy
 
 @router.get("", response_model=list[ProjectResponse])
 async def list_projects(current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Project).where(Project.user_id == current_user.id).order_by(Project.updated_at.desc()))
+    q = select(Project).order_by(Project.updated_at.desc())
+    if not is_admin(current_user):
+        q = q.where(Project.user_id == current_user.id)
+    result = await db.execute(q)
     return result.scalars().all()
 
 
 @router.get("/{project_id}", response_model=ProjectDetailResponse)
 async def get_project(project_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Project not found")
     tasks_result = await db.execute(select(Task).where(Task.project_id == project_id))
     tasks = tasks_result.scalars().all()
@@ -91,7 +94,7 @@ async def get_project(project_id: str, current_user: CurrentUser, db: AsyncSessi
 @router.put("/{project_id}", response_model=ProjectResponse)
 async def update_project(project_id: str, body: ProjectUpdate, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Project not found")
     project.name = body.name
     project.description = body.description
@@ -103,7 +106,7 @@ async def update_project(project_id: str, body: ProjectUpdate, current_user: Cur
 @router.delete("/{project_id}", status_code=204)
 async def delete_project(project_id: str, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Project not found")
     await db.delete(project)
     await db.commit()
@@ -412,7 +415,7 @@ async def patch_estimate_meta(
 ):
     """Update parent_estimate_id and/or calculation_method for an estimate."""
     task = await db.get(Task, task_id)
-    if not task or task.user_id != current_user.id:
+    if not task or not owns_or_admin(current_user, task.user_id):
         raise HTTPException(status_code=404, detail="Task not found")
     if "parent_estimate_id" in body:
         task.parent_estimate_id = body["parent_estimate_id"] or None

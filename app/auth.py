@@ -40,5 +40,14 @@ async def get_admin_user(current_user: User = Depends(get_current_user)) -> User
     return current_user
 
 
+def is_admin(user: User) -> bool:
+    return user.role == "admin"
+
+
+def owns_or_admin(user: User, owner_id: str) -> bool:
+    """Return True if user is the owner of the resource or has admin role."""
+    return user.id == owner_id or user.role == "admin"
+
+
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(get_admin_user)]

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from pydantic import BaseModel
 
-from app.auth import get_current_user, CurrentUser
+from app.auth import get_current_user, CurrentUser, owns_or_admin
 from app.database import get_db
 from app.models.project import Project
 from app.models.task import Task
@@ -171,11 +171,14 @@ class TimelineResponse(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _get_project_owned(project_id: str, user_id: str, db: AsyncSession) -> Project:
+async def _get_project_owned(project_id: str, user_id: str, db: AsyncSession, current_user=None) -> Project:
     project = await db.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    if project.user_id != user_id:
+    if current_user is not None:
+        if not owns_or_admin(current_user, project.user_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif project.user_id != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     return project
 
@@ -205,7 +208,7 @@ async def get_project_stage(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    project = await _get_project_owned(project_id, current_user.id, db)
+    project = await _get_project_owned(project_id, current_user.id, db, current_user)
     return _stage_response(project)
 
 
@@ -216,7 +219,7 @@ async def update_project_stage(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    project = await _get_project_owned(project_id, current_user.id, db)
+    project = await _get_project_owned(project_id, current_user.id, db, current_user)
 
     if body.stage not in STAGE_LABELS:
         raise HTTPException(status_code=400, detail=f"Unknown stage: {body.stage}")
@@ -267,7 +270,7 @@ async def update_project_details(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    project = await _get_project_owned(project_id, current_user.id, db)
+    project = await _get_project_owned(project_id, current_user.id, db, current_user)
 
     update_fields = body.model_dump(exclude_none=True)
     for field, value in update_fields.items():
@@ -303,7 +306,7 @@ async def get_project_timeline(
     db: AsyncSession = Depends(get_db),
 ):
     """Returns stage timeline. Currently returns current stage only (no audit log yet)."""
-    project = await _get_project_owned(project_id, current_user.id, db)
+    project = await _get_project_owned(project_id, current_user.id, db, current_user)
     stage = getattr(project, "stage", None)
 
     history: list[TimelineEntry] = []
@@ -332,7 +335,7 @@ async def get_stage_suggestions(
 ):
     """Returns suggested next stages with readiness info."""
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Project not found")
 
     current_stage = getattr(project, "stage", "LEAD") or "LEAD"

@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.auth import get_current_user
+from app.auth import get_current_user, owns_or_admin
 from app.models.user import User
 from app.models.task import Task
 from app.models.estimate_item import EstimateItem
@@ -29,7 +29,7 @@ async def _get_estimate(task_id: str, user: User, db: AsyncSession) -> Task:
     task = result.scalar_one_or_none()
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Estimate not found")
-    if task.user_id != user.id:
+    if not owns_or_admin(user, task.user_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return task
 

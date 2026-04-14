@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from pydantic import BaseModel
 
-from app.auth import get_current_user, CurrentUser
+from app.auth import get_current_user, CurrentUser, owns_or_admin
 from app.database import get_db
 from app.models.project import Project
 from app.models.work_schedule import WorkScheduleItem, WorkScheduleEntry
@@ -94,11 +94,14 @@ class SummaryPeriod(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _get_project_owned(project_id: str, user_id: str, db: AsyncSession) -> Project:
+async def _get_project_owned(project_id: str, user_id: str, db: AsyncSession, current_user=None) -> Project:
     project = await db.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    if project.user_id != user_id:
+    if current_user is not None:
+        if not owns_or_admin(current_user, project.user_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif project.user_id != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     return project
 
@@ -142,7 +145,7 @@ async def list_schedule_items(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     result = await db.execute(
         select(WorkScheduleItem)
@@ -160,7 +163,7 @@ async def create_schedule_item(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     sort_order = body.sort_order
     if sort_order is None:
@@ -197,7 +200,7 @@ async def update_schedule_item(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     item = await db.get(WorkScheduleItem, item_id)
     if not item or item.project_id != project_id:
@@ -219,7 +222,7 @@ async def delete_schedule_item(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     item = await db.get(WorkScheduleItem, item_id)
     if not item or item.project_id != project_id:
@@ -244,7 +247,7 @@ async def create_items_from_estimates(
 ):
     """Auto-populate GPR from all signed client estimates in the project.
     Skips items already imported (matched by estimate_item_id) and section headers."""
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     # Find all signed, non-subcontractor tasks for this project
     tasks_result = await db.execute(
@@ -328,7 +331,7 @@ async def create_items_from_estimate(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     # Get existing sort_order max
     max_result = await db.execute(
@@ -378,7 +381,7 @@ async def replace_entries(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     item = await db.get(WorkScheduleItem, item_id)
     if not item or item.project_id != project_id:
@@ -435,7 +438,7 @@ async def schedule_summary(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     items_result = await db.execute(
         select(WorkScheduleItem).where(WorkScheduleItem.project_id == project_id)
@@ -502,7 +505,7 @@ async def export_schedule_excel(
 
     # verify project ownership
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Load schedule items with entries

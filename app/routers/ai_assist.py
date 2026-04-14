@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_db
-from app.auth import get_current_user
+from app.auth import get_current_user, owns_or_admin
 from app.models.user import User
 from app.models.task import Task
 from app.models.estimate_item import EstimateItem
@@ -116,7 +116,7 @@ async def ai_assist(
 ):
     # 1. Verify the task belongs to the current user
     task = await db.get(Task, task_id)
-    if not task or task.user_id != current_user.id:
+    if not task or not owns_or_admin(current_user, task.user_id):
         raise HTTPException(status_code=404, detail="Task not found")
 
     # 2. Load estimate items

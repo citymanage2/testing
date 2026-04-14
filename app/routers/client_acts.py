@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from pydantic import BaseModel
 
-from app.auth import get_current_user, CurrentUser
+from app.auth import get_current_user, CurrentUser, owns_or_admin
 from app.database import get_db
 from app.models.project import Project
 from app.models.client_act import ClientKs2Act, ClientKs2ActItem
@@ -100,11 +100,14 @@ class ActioningSummaryItem(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _get_project_owned(project_id: str, user_id: str, db: AsyncSession) -> Project:
+async def _get_project_owned(project_id: str, user_id: str, db: AsyncSession, current_user=None) -> Project:
     project = await db.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    if project.user_id != user_id:
+    if current_user is not None:
+        if not owns_or_admin(current_user, project.user_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif project.user_id != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     return project
 
@@ -172,7 +175,7 @@ async def list_acts(
     task_id: Optional[str] = None,
     act_type: Optional[str] = None,
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     q = select(ClientKs2Act).where(ClientKs2Act.project_id == project_id)
     if task_id:
@@ -191,7 +194,7 @@ async def create_act(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     # Если передан task_id — берём project_id из задачи, игнорируя URL-параметр
     effective_project_id = project_id
@@ -249,7 +252,7 @@ async def update_act(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     act = await db.get(ClientKs2Act, act_id)
     if not act or act.project_id != project_id:
@@ -277,7 +280,7 @@ async def delete_act(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     act = await db.get(ClientKs2Act, act_id)
     if not act or act.project_id != project_id:
@@ -303,7 +306,7 @@ async def list_act_items(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     act = await db.get(ClientKs2Act, act_id)
     if not act or act.project_id != project_id:
@@ -365,7 +368,7 @@ async def replace_act_items(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     act = await db.get(ClientKs2Act, act_id)
     if not act or act.project_id != project_id:
@@ -528,7 +531,7 @@ async def actioning_summary(
     db: AsyncSession = Depends(get_db),
     task_id: Optional[str] = None,
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
 
     if task_id:
         # Filter by specific task
@@ -625,7 +628,7 @@ async def export_ks2(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_project_owned(project_id, current_user.id, db)
+    await _get_project_owned(project_id, current_user.id, db, current_user)
     act = await db.get(ClientKs2Act, act_id)
     if not act or act.project_id != project_id:
         raise HTTPException(status_code=404, detail="Act not found")

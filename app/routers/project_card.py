@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.database import get_db
-from app.auth import get_current_user
+from app.auth import get_current_user, owns_or_admin
 from app.models.user import User
 from app.models.project import Project
 from app.models.project_gallery import ProjectGallery
@@ -67,7 +67,7 @@ async def get_project_card(
     db: AsyncSession = Depends(get_db),
 ):
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Not found")
     gallery_count = (await db.execute(select(func.count()).where(ProjectGallery.project_id == project_id))).scalar() or 0
     client_name = None
@@ -92,7 +92,7 @@ async def update_project_card(
     db: AsyncSession = Depends(get_db),
 ):
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Not found")
     if body.status and body.status not in PROJECT_STATUSES:
         raise HTTPException(status_code=400, detail=f"status must be one of {PROJECT_STATUSES}")
@@ -145,7 +145,7 @@ async def upload_gallery_image(
     db: AsyncSession = Depends(get_db),
 ):
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Not found")
     if file.content_type not in ALLOWED_IMAGE_MIME:
         raise HTTPException(status_code=400, detail="Только изображения PNG/JPEG/WebP/GIF")
@@ -165,7 +165,7 @@ async def upload_gallery_image(
 @router.get("/{project_id}/gallery/{img_id}")
 async def get_gallery_image(project_id: str, img_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Not found")
     row = await db.get(ProjectGallery, img_id)
     if not row or row.project_id != project_id:
@@ -176,7 +176,7 @@ async def get_gallery_image(project_id: str, img_id: int, current_user: User = D
 @router.delete("/{project_id}/gallery/{img_id}")
 async def delete_gallery_image(project_id: str, img_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Not found")
     row = await db.get(ProjectGallery, img_id)
     if not row or row.project_id != project_id:
@@ -237,7 +237,7 @@ async def add_payment(
     db: AsyncSession = Depends(get_db),
 ):
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Not found")
     if body.direction not in ("income", "expense"):
         raise HTTPException(status_code=400, detail="direction must be income or expense")
@@ -302,7 +302,7 @@ async def financial_summary(
     db: AsyncSession = Depends(get_db),
 ):
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Not found")
 
     tasks = (await db.execute(select(Task).where(Task.project_id == project_id))).scalars().all()
@@ -355,7 +355,7 @@ async def estimates_with_totals(
     db: AsyncSession = Depends(get_db),
 ):
     project = await db.get(Project, project_id)
-    if not project or project.user_id != current_user.id:
+    if not project or not owns_or_admin(current_user, project.user_id):
         raise HTTPException(status_code=404, detail="Not found")
 
     tasks = (await db.execute(select(Task).where(Task.project_id == project_id).order_by(Task.created_at))).scalars().all()

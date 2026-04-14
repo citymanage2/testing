@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.auth import get_current_user, CurrentUser
+from app.auth import get_current_user, CurrentUser, is_admin, owns_or_admin
 from app.database import get_db
 from app.models.task import Task, TASK_TYPES, ALLOWED_MIME_TYPES
 from app.models.task_input_file import TaskInputFile
@@ -16,7 +16,9 @@ router = APIRouter()
 
 @router.get("", response_model=list[TaskStatusResponse])
 async def list_tasks(current_user: CurrentUser, db: AsyncSession = Depends(get_db), no_project: bool = False):
-    q = select(Task).where(Task.user_id == current_user.id)
+    q = select(Task)
+    if not is_admin(current_user):
+        q = q.where(Task.user_id == current_user.id)
     if no_project:
         q = q.where(Task.project_id.is_(None))
     q = q.order_by(Task.created_at.desc()).limit(100)
@@ -172,7 +174,7 @@ async def delete_task(
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if task.user_id != current_user.id:
+    if not owns_or_admin(current_user, task.user_id):
         raise HTTPException(status_code=403, detail="Forbidden")
     await db.delete(task)
     await db.commit()
@@ -220,7 +222,7 @@ async def get_sub_distribution(
     source_task = await db.get(Task, task_id)
     if not source_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if source_task.user_id != current_user.id:
+    if not owns_or_admin(current_user, source_task.user_id):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     # Get source items
@@ -230,13 +232,13 @@ async def get_sub_distribution(
     source_items = [i for i in items_result.scalars().all() if i.row_type != 'section_header']
 
     # Get all subcontractor tasks linked to this parent
-    sub_tasks_result = await db.execute(
-        select(Task).where(
-            Task.parent_estimate_id == task_id,
-            Task.estimate_type == "subcontractor",
-            Task.user_id == current_user.id,
-        )
+    sub_tasks_q = select(Task).where(
+        Task.parent_estimate_id == task_id,
+        Task.estimate_type == "subcontractor",
     )
+    if not is_admin(current_user):
+        sub_tasks_q = sub_tasks_q.where(Task.user_id == current_user.id)
+    sub_tasks_result = await db.execute(sub_tasks_q)
     sub_task_ids = [t.id for t in sub_tasks_result.scalars().all()]
 
     # Collect quantities from all sub-estimates, matched by item name
@@ -283,7 +285,7 @@ async def copy_task_as_subcontractor(
     source_task = await db.get(Task, task_id)
     if not source_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if source_task.user_id != current_user.id:
+    if not owns_or_admin(current_user, source_task.user_id):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     include_materials = body.get("include_materials", True)
