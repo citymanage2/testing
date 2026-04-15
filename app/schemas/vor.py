@@ -18,7 +18,7 @@ class VorItem(BaseModel):
         default="work",
         description="Position type: work | material | equipment",
     )
-    name: str = Field(..., min_length=1, description="Position name")
+    name: str = Field(default="", description="Position name")
     unit: str = Field(default="шт", description="Unit of measurement")
     quantity: Optional[float] = Field(
         default=None,
@@ -64,7 +64,7 @@ class VorItem(BaseModel):
 
     @model_validator(mode="after")
     def _strip_name(self) -> "VorItem":
-        self.name = self.name.strip()
+        self.name = self.name.strip() if self.name else ""
         return self
 
 
@@ -124,14 +124,14 @@ class ClaudeVorResponse(BaseModel):
     meta: Meta = Field(default_factory=Meta)
 
     def all_items(self) -> list[VorItem]:
-        """Flat list of all items across all sections."""
+        """Flat list of all items across all sections, skipping nameless rows."""
         result = []
         for section in self.sections:
             for item in section.items:
-                # Carry section title down to item if item.section is blank
                 if not item.section:
                     item.section = section.title
-                result.append(item)
+                if item.name:  # skip rows Claude returned without a name
+                    result.append(item)
         return result
 
     @model_validator(mode="after")
