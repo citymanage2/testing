@@ -46,6 +46,28 @@ export default function AiAssistModal({ taskId, onClose, selectedIds, onPricesAp
 
   const isFillPricesChip = prompt === FILL_PRICES_CHIP;
 
+  // ── Fill prices helper ──────────────────────────────────────────────────────
+
+  async function callFillPrices(promptText: string) {
+    try {
+      const itemIds = selectedIds && selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
+      const { data } = await client.post<FillPricesResponse>(
+        `/projects/estimates/${taskId}/ai-fill-prices`,
+        { item_ids: itemIds, prompt: promptText },
+      );
+      setResponse(data.message ?? '');
+      setUsedAi(true);
+      setIsFillMode(true);
+      if (data.updated > 0 && onPricesApplied) onPricesApplied();
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.message || 'неизвестная ошибка';
+      setResponse(`Ошибка при заполнении цен: ${detail}`);
+      setUsedAi(false);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // ── Submit ──────────────────────────────────────────────────────────────────
 
   async function handleSubmit() {
@@ -56,22 +78,7 @@ export default function AiAssistModal({ taskId, onClose, selectedIds, onPricesAp
 
     // "Заполнить цены" — special endpoint
     if (isFillPricesChip) {
-      try {
-        const itemIds = selectedIds && selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
-        const { data } = await client.post<FillPricesResponse>(
-          `/projects/estimates/${taskId}/ai-fill-prices`,
-          { item_ids: itemIds, prompt: '' },
-        );
-        setResponse(data.message ?? '');
-        setUsedAi(true);
-        setIsFillMode(true);
-        if (data.updated > 0 && onPricesApplied) onPricesApplied();
-      } catch {
-        setResponse('Произошла ошибка при заполнении цен.');
-        setUsedAi(false);
-      } finally {
-        setLoading(false);
-      }
+      await callFillPrices('');
       return;
     }
 
@@ -79,29 +86,13 @@ export default function AiAssistModal({ taskId, onClose, selectedIds, onPricesAp
     const lowerPrompt = prompt.toLowerCase();
     const isPriceFillIntent = (
       lowerPrompt.includes('заполни') || lowerPrompt.includes('проставь') ||
-      lowerPrompt.includes('рассчита') || lowerPrompt.includes('цен')
+      lowerPrompt.includes('рассчита')
     ) && (
-      lowerPrompt.includes('цен') || lowerPrompt.includes('стоимост') ||
-      lowerPrompt.includes('прайс') || lowerPrompt.includes('позици')
+      lowerPrompt.includes('цен') || lowerPrompt.includes('стоимост') || lowerPrompt.includes('прайс')
     );
 
     if (isPriceFillIntent) {
-      try {
-        const itemIds = selectedIds && selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
-        const { data } = await client.post<FillPricesResponse>(
-          `/projects/estimates/${taskId}/ai-fill-prices`,
-          { item_ids: itemIds, prompt: prompt.trim() },
-        );
-        setResponse(data.message ?? '');
-        setUsedAi(true);
-        setIsFillMode(true);
-        if (data.updated > 0 && onPricesApplied) onPricesApplied();
-      } catch {
-        setResponse('Произошла ошибка при заполнении цен.');
-        setUsedAi(false);
-      } finally {
-        setLoading(false);
-      }
+      await callFillPrices(prompt.trim());
       return;
     }
 

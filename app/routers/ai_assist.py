@@ -244,7 +244,7 @@ async def ai_fill_prices(
             max_tokens=8000,
         )
     except Exception as e:
-        logger.error("Claude price fill failed: %s", e)
+        logger.exception("Claude price fill failed for task %s: %s", task_id, e)
         raise HTTPException(status_code=502, detail=f"Claude API error: {e}")
 
     # Parse JSON (strip markdown fences if present)
@@ -289,9 +289,13 @@ async def ai_fill_prices(
             item.comment = str(prices["comment"])
         updated += 1
 
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception as e:
+        logger.exception("DB commit failed after price fill for task %s: %s", task_id, e)
+        raise HTTPException(status_code=500, detail=f"Ошибка сохранения в БД: {e}")
 
-    suffix = f" (показано первые {MAX_ITEMS})" if len(all_items) > MAX_ITEMS else ""
+    suffix = f" (первые {MAX_ITEMS} из {len(all_items)})" if len(all_items) > MAX_ITEMS else ""
     return {
         "updated": updated,
         "total_sent": len(target_items),
