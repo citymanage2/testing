@@ -24,10 +24,20 @@ MAX_TOKENS = 16000
 MAX_TOKENS_SMETA = 32000  # Estimates can be large — use higher limit
 
 
-async def complete(system: str, messages: list[dict], max_tokens: int = MAX_TOKENS, model: str = MODEL) -> str:
+async def complete(
+    system: str,
+    messages: list[dict],
+    max_tokens: int = MAX_TOKENS,
+    model: str = MODEL,
+    chunk_callback=None,  # async callable(chunks_received: int) | None
+    chunk_callback_interval: int = 15,  # call every N chunks
+) -> str:
     """
     Call Claude and return the full text response.
     Uses streaming to avoid the 10-minute timeout on long requests.
+
+    chunk_callback — optional async function called every chunk_callback_interval chunks.
+    Use it to update progress while Claude is generating a long response.
     """
     import asyncio
     from anthropic import APIStatusError, APIConnectionError, APITimeoutError
@@ -37,6 +47,7 @@ async def complete(system: str, messages: list[dict], max_tokens: int = MAX_TOKE
     for attempt in range(5):
         try:
             chunks: list[str] = []
+            chunk_count = 0
             async with client.messages.stream(
                 model=model,
                 max_tokens=max_tokens,
@@ -45,6 +56,9 @@ async def complete(system: str, messages: list[dict], max_tokens: int = MAX_TOKE
             ) as stream:
                 async for text in stream.text_stream:
                     chunks.append(text)
+                    chunk_count += 1
+                    if chunk_callback and chunk_count % chunk_callback_interval == 0:
+                        await chunk_callback(chunk_count)
             return "".join(chunks)
         except APIStatusError as e:
             if e.status_code in _RETRYABLE_STATUS and attempt < 4:

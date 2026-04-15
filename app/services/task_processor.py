@@ -486,7 +486,9 @@ class TaskProcessor:
         self._prog(task, 30, "Анализ документов", "Claude читает входные файлы...")
         await db.commit()
 
-        vor_response = await self._call_claude_with_retry(system, messages, model)
+        vor_response = await self._call_claude_with_retry(
+            system, messages, model, db=db, task=task, start_pct=30, end_pct=68,
+        )
 
         self._prog(task, 70, "Валидация и дедупликация", "Проверка схемы, удаление дублей...")
         await db.commit()
@@ -570,7 +572,9 @@ class TaskProcessor:
         self._prog(task, 30, "Анализ документов", "Claude читает входные файлы и составляет позиции...")
         await db.commit()
 
-        vor_response = await self._call_claude_with_retry(system, messages, model)
+        vor_response = await self._call_claude_with_retry(
+            system, messages, model, db=db, task=task, start_pct=30, end_pct=58,
+        )
 
         self._prog(task, 60, "Валидация и дедупликация", "Проверка схемы, удаление дублей...")
         await db.commit()
@@ -693,7 +697,8 @@ class TaskProcessor:
                 {"type": "text", "text": "Извлеки все работы и материалы из этой проектной документации. " + _JSON_SCHEMA_PROMPT},
             ]}]
             project_response = await self._call_claude_with_retry(
-                TASK_SYSTEMS["LIST_FROM_PROJECT"], proj_messages, model
+                TASK_SYSTEMS["LIST_FROM_PROJECT"], proj_messages, model,
+                db=db, task=task, start_pct=40, end_pct=63,
             )
             project_items = _deduplicate_items(project_response.all_items())
         else:
@@ -742,14 +747,46 @@ class TaskProcessor:
     # ------------------------------------------------------------------
 
     async def _call_claude_with_retry(
-        self, system: str, messages: list, model: str
+        self,
+        system: str,
+        messages: list,
+        model: str,
+        db=None,
+        task=None,
+        start_pct: int = 30,
+        end_pct: int = 65,
     ) -> ClaudeVorResponse:
         """
         Call Claude and validate response against ClaudeVorResponse schema.
         Retries once with a stricter prompt on validation failure.
         After 2 failures raises ValueError → task goes to failed status.
+
+        If db and task are provided, updates progress_message during streaming
+        by interpolating from start_pct to end_pct using a logarithmic curve
+        (moves fast at first, slows down as it approaches end_pct).
         """
-        raw = await claude_service.complete(system, messages, model=model, max_tokens=MAX_TOKENS_SMETA)
+        # ~600 chunks ≈ typical large smeta response; asymptotic so never reaches 100%
+        _EXPECTED_CHUNKS = 600
+
+        async def _make_progress_callback(attempt_label: str):
+            async def _cb(n: int):
+                if db is None or task is None:
+                    return
+                # Logarithmic interpolation: fast start, asymptotic end
+                import math
+                fraction = math.log1p(n) / math.log1p(_EXPECTED_CHUNKS)
+                fraction = min(fraction, 0.95)
+                pct = int(start_pct + (end_pct - start_pct) * fraction)
+                label_parts = task.progress_message.split("|") if task.progress_message else []
+                label = label_parts[1] if len(label_parts) > 1 else "Обработка..."
+                task.progress_message = f"{pct}|{label}|{attempt_label} ({n} фрагментов)"
+                await db.commit()
+            return _cb
+
+        raw = await claude_service.complete(
+            system, messages, model=model, max_tokens=MAX_TOKENS_SMETA,
+            chunk_callback=await _make_progress_callback("Claude генерирует ответ"),
+        )
         try:
             return _validate_vor_response(raw)
         except (ValueError, ValidationError):
@@ -757,7 +794,10 @@ class TaskProcessor:
 
         retry_suffix = "\n\nОТВЕТ ДОЛЖЕН БЫТЬ ТОЛЬКО JSON. Никаких пояснений, никаких markdown-обёрток. Начни ответ с символа {."
         retry_messages = messages + [{"role": "user", "content": retry_suffix}]
-        raw2 = await claude_service.complete(system, retry_messages, model=model, max_tokens=MAX_TOKENS_SMETA)
+        raw2 = await claude_service.complete(
+            system, retry_messages, model=model, max_tokens=MAX_TOKENS_SMETA,
+            chunk_callback=await _make_progress_callback("Повторная попытка"),
+        )
         try:
             return _validate_vor_response(raw2)
         except (ValueError, ValidationError) as e:
