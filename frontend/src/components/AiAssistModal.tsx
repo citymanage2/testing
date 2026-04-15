@@ -7,6 +7,8 @@ import { C, btnPrimary, btnGhost, INPUT, OVERLAY, MODAL } from '../ui';
 interface Props {
   taskId: string;
   onClose: () => void;
+  selectedIds?: Set<string>;       // items selected in EstimateView
+  onPricesApplied?: () => void;    // callback to reload estimate after fill
 }
 
 interface AiResponse {
@@ -14,9 +16,18 @@ interface AiResponse {
   used_ai: boolean;
 }
 
+interface FillPricesResponse {
+  updated: number;
+  total_sent: number;
+  message: string;
+}
+
+const FILL_PRICES_CHIP = 'Заполнить цены';
+
 // ─── Suggestion chips ─────────────────────────────────────────────────────────
 
 const CHIPS = [
+  FILL_PRICES_CHIP,
   'Найти позиции с нулевыми ценами',
   'Проверить наличие разделов',
   'Найти дублирующиеся позиции',
@@ -26,11 +37,14 @@ const CHIPS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function AiAssistModal({ taskId, onClose }: Props) {
-  const [prompt, setPrompt]     = useState('');
-  const [response, setResponse] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [usedAi, setUsedAi]     = useState(false);
+export default function AiAssistModal({ taskId, onClose, selectedIds, onPricesApplied }: Props) {
+  const [prompt, setPrompt]       = useState('');
+  const [response, setResponse]   = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [usedAi, setUsedAi]       = useState(false);
+  const [isFillMode, setIsFillMode] = useState(false);
+
+  const isFillPricesChip = prompt === FILL_PRICES_CHIP;
 
   // ── Submit ──────────────────────────────────────────────────────────────────
 
@@ -38,6 +52,60 @@ export default function AiAssistModal({ taskId, onClose }: Props) {
     if (!prompt.trim() || loading) return;
     setLoading(true);
     setResponse('');
+    setIsFillMode(false);
+
+    // "Заполнить цены" — special endpoint
+    if (isFillPricesChip) {
+      try {
+        const itemIds = selectedIds && selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
+        const { data } = await client.post<FillPricesResponse>(
+          `/projects/estimates/${taskId}/ai-fill-prices`,
+          { item_ids: itemIds, prompt: '' },
+        );
+        setResponse(data.message ?? '');
+        setUsedAi(true);
+        setIsFillMode(true);
+        if (data.updated > 0 && onPricesApplied) onPricesApplied();
+      } catch {
+        setResponse('Произошла ошибка при заполнении цен.');
+        setUsedAi(false);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Detect price-fill intent in free-form prompt
+    const lowerPrompt = prompt.toLowerCase();
+    const isPriceFillIntent = (
+      lowerPrompt.includes('заполни') || lowerPrompt.includes('проставь') ||
+      lowerPrompt.includes('рассчита') || lowerPrompt.includes('цен')
+    ) && (
+      lowerPrompt.includes('цен') || lowerPrompt.includes('стоимост') ||
+      lowerPrompt.includes('прайс') || lowerPrompt.includes('позици')
+    );
+
+    if (isPriceFillIntent) {
+      try {
+        const itemIds = selectedIds && selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
+        const { data } = await client.post<FillPricesResponse>(
+          `/projects/estimates/${taskId}/ai-fill-prices`,
+          { item_ids: itemIds, prompt: prompt.trim() },
+        );
+        setResponse(data.message ?? '');
+        setUsedAi(true);
+        setIsFillMode(true);
+        if (data.updated > 0 && onPricesApplied) onPricesApplied();
+      } catch {
+        setResponse('Произошла ошибка при заполнении цен.');
+        setUsedAi(false);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Regular analysis
     try {
       const { data } = await client.post<AiResponse>(
         `/projects/estimates/${taskId}/ai-assist`,
@@ -157,6 +225,15 @@ export default function AiAssistModal({ taskId, onClose }: Props) {
           </span>
         </div>
 
+        {/* Selected items hint for fill mode */}
+        {isFillPricesChip && (
+          <div style={{ fontSize: 12, color: C.textSec, background: C.primaryBg, borderRadius: 6, padding: '8px 12px', border: `1px solid ${C.primary}` }}>
+            {selectedIds && selectedIds.size > 0
+              ? `💡 Будут заполнены цены для ${selectedIds.size} выбранных позиций`
+              : '💡 Будут заполнены цены для всех позиций с нулевой ценой'}
+          </div>
+        )}
+
         {/* Submit button */}
         <div>
           <button
@@ -171,8 +248,10 @@ export default function AiAssistModal({ taskId, onClose }: Props) {
           >
             {loading ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <LoadingDots /> Анализирую...
+                <LoadingDots /> {isFillPricesChip ? 'Заполняю цены...' : 'Анализирую...'}
               </span>
+            ) : isFillPricesChip ? (
+              '💰 Заполнить цены'
             ) : (
               '🔍 Анализировать'
             )}
@@ -198,12 +277,12 @@ export default function AiAssistModal({ taskId, onClose }: Props) {
                     borderRadius: 99,
                     fontSize: 11,
                     fontWeight: 600,
-                    background: C.primaryBg,
-                    color: C.primary,
-                    border: `1px solid ${C.primary}`,
+                    background: isFillMode ? '#e8f5e9' : C.primaryBg,
+                    color: isFillMode ? '#2e7d32' : C.primary,
+                    border: `1px solid ${isFillMode ? '#4caf50' : C.primary}`,
                   }}
                 >
-                  ✨ Ответ ИИ
+                  {isFillMode ? '✅ Цены заполнены' : '✨ Ответ ИИ'}
                 </span>
               ) : (
                 <span

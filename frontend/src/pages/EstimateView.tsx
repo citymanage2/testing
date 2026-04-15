@@ -1043,7 +1043,7 @@ export default function EstimateView() {
       {showHistory && id && <VersionHistoryDrawer taskId={id} onClose={() => setShowHistory(false)} onRestored={() => { setShowHistory(false); load(); }} />}
       {showOpt && id && <OptimizationChecklist taskId={id} onClose={() => setShowOpt(false)} onOptimized={() => { setShowOpt(false); load(); }} />}
       {analogueItemId && id && analogueItem && <AnaloguePanel taskId={id} itemId={analogueItemId} isAnalogue={analogueItem.is_analogue} onClose={() => setAnalogueItemId(null)} onApplied={() => { setAnalogueItemId(null); load(); }} />}
-      {showAiAssist && id && <AiAssistModal taskId={id} onClose={() => setShowAiAssist(false)} />}
+      {showAiAssist && id && <AiAssistModal taskId={id} onClose={() => setShowAiAssist(false)} selectedIds={selectedIds} onPricesApplied={load} />}
       {showBatchAnalogue && id && data && (
         <BatchAnalogueModal
           taskId={id}
