@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import client from '../api/client';
 import StatusBadge from '../components/StatusBadge';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 interface TaskData {
   id: string; task_type: string; status: string; estimate_status: string | null;
@@ -85,6 +84,20 @@ export default function TaskStatus() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function downloadFile(fileId: number, fileName: string, mimeType: string) {
+    try {
+      const { data } = await client.get(`/results/${fileId}/download`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([data], { type: mimeType }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Не удалось скачать файл');
+    }
+  }
+
   if (!task) return <div style={{ padding: 24 }}>Загрузка...</div>;
   const isActive = ['pending', 'processing'].includes(task.status);
   const progress = parseProgress(task.progress_message);
@@ -119,7 +132,7 @@ export default function TaskStatus() {
           {results.map((f) => (
             <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', border: '1px solid #e0e0e0', borderRadius: 4, background: '#fafafa', marginBottom: 6 }}>
               <span>{f.file_name}</span>
-              <a href={`${API_BASE}/results/${f.id}/download`} target="_blank" rel="noreferrer" style={{ padding: '4px 12px', background: '#1565c0', color: '#fff', borderRadius: 4, textDecoration: 'none', fontSize: 13 }}>Скачать</a>
+              <button onClick={() => downloadFile(f.id, f.file_name, f.mime_type)} style={{ padding: '4px 12px', background: '#1565c0', color: '#fff', borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 13 }}>Скачать</button>
             </div>
           ))}
         </div>
