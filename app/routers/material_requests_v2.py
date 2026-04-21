@@ -33,6 +33,7 @@ def _now() -> datetime:
 
 
 async def _adjust_reserved(
+    current_user: CurrentUser,
     db: AsyncSession,
     req: MaterialRequest,
     delta: Decimal,  # +N = резервировать, -N = снять резерв
@@ -108,7 +109,6 @@ async def list_requests(
     project_id: str = Query(...),
     status: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     q = select(MaterialRequest).where(MaterialRequest.project_id == project_id)
     if status:
@@ -119,9 +119,9 @@ async def list_requests(
 
 @router.post("", response_model=MaterialRequestResponse, status_code=201)
 async def create_request(
+    current_user: CurrentUser,
     body: MaterialRequestCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     req = MaterialRequest(
         id=str(uuid.uuid4()),
@@ -143,9 +143,9 @@ async def create_request(
 
 @router.get("/{request_id}", response_model=MaterialRequestWithItems)
 async def get_request(
+    current_user: CurrentUser,
     request_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     req = await _get_request_or_404(db, request_id)
     items = (await db.execute(
@@ -159,10 +159,10 @@ async def get_request(
 
 @router.patch("/{request_id}", response_model=MaterialRequestResponse)
 async def update_request(
+    current_user: CurrentUser,
     request_id: str,
     body: MaterialRequestUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     req = await _get_request_or_404(db, request_id)
     data = body.model_dump(exclude_unset=True)
@@ -177,9 +177,9 @@ async def update_request(
 
 @router.delete("/{request_id}", status_code=204)
 async def delete_request(
+    current_user: CurrentUser,
     request_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     req = await _get_request_or_404(db, request_id)
     if req.status not in ("draft", "cancelled"):
@@ -192,10 +192,10 @@ async def delete_request(
 
 @router.post("/{request_id}/transition", response_model=MaterialRequestResponse)
 async def transition_status(
+    current_user: CurrentUser,
     request_id: str,
     new_status: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     """Явный переход статуса заявки с управлением reserved_quantity на складе.
 
@@ -232,9 +232,9 @@ async def transition_status(
 
 @router.get("/{request_id}/items", response_model=list[RequestItemResponse])
 async def list_items(
+    current_user: CurrentUser,
     request_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     await _get_request_or_404(db, request_id)
     rows = (await db.execute(
@@ -245,10 +245,10 @@ async def list_items(
 
 @router.post("/{request_id}/items", response_model=RequestItemResponse, status_code=201)
 async def add_item(
+    current_user: CurrentUser,
     request_id: str,
     body: RequestItemCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     req = await _get_request_or_404(db, request_id)
     if req.status not in ("draft",):
@@ -272,11 +272,11 @@ async def add_item(
 
 @router.patch("/{request_id}/items/{item_id}", response_model=RequestItemResponse)
 async def update_item(
+    current_user: CurrentUser,
     request_id: str,
     item_id: str,
     body: RequestItemUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     req = await _get_request_or_404(db, request_id)
     item = await _get_item_or_404(db, item_id)
@@ -299,10 +299,10 @@ async def update_item(
 
 @router.delete("/{request_id}/items/{item_id}", status_code=204)
 async def delete_item(
+    current_user: CurrentUser,
     request_id: str,
     item_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     await _get_request_or_404(db, request_id)
     item = await _get_item_or_404(db, item_id)

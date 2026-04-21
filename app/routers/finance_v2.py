@@ -54,11 +54,11 @@ def _to_plan_fact_response(pf) -> ProjectPlanFactResponse:
 
 @router.get("/projects/{project_id}/budget", response_model=list[BudgetEntryResponse])
 async def list_budget_entries(
+    current_user: CurrentUser,
     project_id: str,
     entry_type: str | None = Query(None),
     category: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     q = select(ProjectBudgetEntry).where(ProjectBudgetEntry.project_id == project_id)
     if entry_type:
@@ -71,10 +71,10 @@ async def list_budget_entries(
 
 @router.post("/projects/{project_id}/budget", response_model=BudgetEntryResponse, status_code=201)
 async def create_budget_entry(
+    current_user: CurrentUser,
     project_id: str,
     body: BudgetEntryCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     if body.entry_type not in ENTRY_TYPES:
         raise HTTPException(status_code=422, detail=f"entry_type должен быть одним из: {ENTRY_TYPES}")
@@ -105,11 +105,11 @@ async def create_budget_entry(
 
 @router.patch("/projects/{project_id}/budget/{entry_id}", response_model=BudgetEntryResponse)
 async def update_budget_entry(
+    current_user: CurrentUser,
     project_id: str,
     entry_id: str,
     body: BudgetEntryUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     entry = await db.get(ProjectBudgetEntry, entry_id)
     if not entry or entry.project_id != project_id:
@@ -124,10 +124,10 @@ async def update_budget_entry(
 
 @router.delete("/projects/{project_id}/budget/{entry_id}", status_code=204)
 async def delete_budget_entry(
+    current_user: CurrentUser,
     project_id: str,
     entry_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     entry = await db.get(ProjectBudgetEntry, entry_id)
     if not entry or entry.project_id != project_id:
@@ -140,9 +140,9 @@ async def delete_budget_entry(
 
 @router.get("/projects/{project_id}/plan-fact", response_model=ProjectPlanFactResponse)
 async def project_plan_fact(
+    current_user: CurrentUser,
     project_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     """Дашборд план/факт по проекту: сметы + бюджетные записи."""
     pf = await get_project_plan_fact(db, project_id)
@@ -151,9 +151,9 @@ async def project_plan_fact(
 
 @router.get("/projects/{project_id}/forecast", response_model=ProjectForecastResponse)
 async def project_forecast(
+    current_user: CurrentUser,
     project_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     """Прогноз до конца проекта: экстраполяция на основе % выполнения ГПР."""
     fc = await get_project_forecast(db, project_id)
@@ -171,9 +171,9 @@ async def project_forecast(
 
 @router.get("/company/pl", response_model=CompanyPLResponse)
 async def company_pl(
+    current_user: CurrentUser,
     project_ids: list[str] | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     """П&У по всем или указанным проектам компании (для директора/финансиста)."""
     pl = await get_company_pl(db, project_ids)
