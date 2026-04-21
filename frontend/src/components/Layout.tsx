@@ -13,12 +13,29 @@ const NAV_LINKS = [
   { path: '/settings/company', icon: '⚙️',  label: 'Настройки' },
 ];
 
+const NAV_LINKS_V2 = [
+  { path: '/v2/estimates',         icon: '📄', label: 'Сметы v2' },
+  { path: '/v2/catalog',           icon: '🗂', label: 'Каталог v2' },
+  { path: '/v2/grp',               icon: '📅', label: 'ГПР' },
+  { path: '/v2/warehouse',         icon: '🏗', label: 'Склад' },
+  { path: '/v2/material-requests', icon: '📦', label: 'Заявки на материалы' },
+  { path: '/v2/finance',           icon: '💰', label: 'Финансы v2' },
+  { path: '/v2/assistant',         icon: '🤖', label: 'ИИ-ассистент' },
+];
+
 const PAGE_TITLES: Record<string, string> = {
   '/catalog': 'Каталог расценок',
   '/contractors': 'Контрагенты',
   '/calculator': 'Калькулятор',
   '/settings/company': 'Настройки компании',
   '/admin': 'Администрирование',
+  '/v2/estimates': 'Сметы v2',
+  '/v2/catalog': 'Каталог v2',
+  '/v2/grp': 'ГПР — График производства работ',
+  '/v2/warehouse': 'Склад',
+  '/v2/material-requests': 'Заявки на материалы',
+  '/v2/finance': 'Финансы v2',
+  '/v2/assistant': 'ИИ-ассистент',
 };
 
 export default function Layout() {
@@ -40,6 +57,7 @@ export default function Layout() {
     }
     if (location.pathname.startsWith('/projects/')) return 'Проект';
     if (location.pathname.startsWith('/task/')) return 'Смета';
+    if (location.pathname.startsWith('/v2/estimates/')) return 'Смета v2';
     return 'СМ Смета';
   })();
 
@@ -140,6 +158,38 @@ export default function Layout() {
         )}
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
           <ProjectsSidebar collapsed={collapsed} />
+        </div>
+
+        {/* v2 nav section */}
+        <div style={{ flexShrink: 0, borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
+          {!collapsed && (
+            <div style={{ padding: '4px 16px 4px', fontSize: 11, fontWeight: 600, color: C.textMuted, letterSpacing: '.06em', textTransform: 'uppercase' }}>
+              Архитектура v2
+            </div>
+          )}
+          {NAV_LINKS_V2.map(({ path, icon, label }) => {
+            const active = location.pathname === path || location.pathname.startsWith(path + '/');
+            return (
+              <button
+                key={path}
+                onClick={() => navigate(path)}
+                title={collapsed ? label : undefined}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center',
+                  gap: 10, padding: collapsed ? '9px 0' : '9px 16px',
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  background: active ? C.primaryBg : 'transparent',
+                  border: 'none', borderLeft: active ? `2px solid ${C.primary}` : '2px solid transparent',
+                  cursor: 'pointer', fontSize: 13, fontWeight: active ? 600 : 400,
+                  color: active ? C.primary : C.textSec,
+                  whiteSpace: 'nowrap', transition: 'background .15s, color .15s',
+                }}
+              >
+                <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
+                {!collapsed && label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Tools nav section */}
