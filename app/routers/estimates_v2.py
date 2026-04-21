@@ -629,7 +629,7 @@ async def import_estimate_from_file(
     source_name: str = Form("Смета заказчика", description="Название источника цен"),
     use_ai: bool = Form(True, description="Включить AI-нормализацию и сопоставление с каталогом"),
     file: UploadFile = File(...),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     """
