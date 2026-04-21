@@ -36,9 +36,9 @@ async def _get_warehouse_or_404(db: AsyncSession, warehouse_id: str) -> Warehous
 
 @router.get("", response_model=list[WarehouseResponse])
 async def list_warehouses(
+    current_user: CurrentUser,
     project_id: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     q = select(Warehouse).where(Warehouse.is_active == True)
     if project_id:
@@ -49,9 +49,9 @@ async def list_warehouses(
 
 @router.post("", response_model=WarehouseResponse, status_code=201)
 async def create_warehouse(
+    current_user: CurrentUser,
     body: WarehouseCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     wh = Warehouse(
         id=str(uuid.uuid4()),
@@ -66,19 +66,19 @@ async def create_warehouse(
 
 @router.get("/{warehouse_id}", response_model=WarehouseResponse)
 async def get_warehouse(
+    current_user: CurrentUser,
     warehouse_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     return await _get_warehouse_or_404(db, warehouse_id)
 
 
 @router.patch("/{warehouse_id}", response_model=WarehouseResponse)
 async def update_warehouse(
+    current_user: CurrentUser,
     warehouse_id: str,
     body: WarehouseUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     wh = await _get_warehouse_or_404(db, warehouse_id)
     for field, value in body.model_dump(exclude_unset=True).items():
@@ -90,9 +90,9 @@ async def update_warehouse(
 
 @router.delete("/{warehouse_id}", status_code=204)
 async def delete_warehouse(
+    current_user: CurrentUser,
     warehouse_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     wh = await _get_warehouse_or_404(db, warehouse_id)
     wh.is_active = False  # мягкое удаление
@@ -103,9 +103,9 @@ async def delete_warehouse(
 
 @router.get("/{warehouse_id}/stock", response_model=list[StockItemResponse])
 async def get_stock(
+    current_user: CurrentUser,
     warehouse_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     await _get_warehouse_or_404(db, warehouse_id)
     rows = (await db.execute(
@@ -134,10 +134,10 @@ async def get_stock(
 
 @router.get("/{warehouse_id}/movements", response_model=list[StockMovementResponse])
 async def list_movements(
+    current_user: CurrentUser,
     warehouse_id: str,
     limit: int = Query(50, le=200),
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     await _get_warehouse_or_404(db, warehouse_id)
     rows = (await db.execute(
@@ -151,10 +151,10 @@ async def list_movements(
 
 @router.post("/{warehouse_id}/movements", response_model=StockMovementResponse, status_code=201)
 async def create_movement(
+    current_user: CurrentUser,
     warehouse_id: str,
     body: StockMovementCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     """Регистрирует движение и автоматически обновляет остатки."""
     if body.movement_type not in MOVEMENT_TYPES:

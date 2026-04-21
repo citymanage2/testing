@@ -32,9 +32,9 @@ async def _get_stage_or_404(db: AsyncSession, stage_id: str) -> WorkStage:
 
 @router.get("", response_model=list[WorkStageResponse])
 async def list_stages(
+    current_user: CurrentUser,
     project_id: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     rows = (await db.execute(
         select(WorkStage)
@@ -46,10 +46,10 @@ async def list_stages(
 
 @router.post("", response_model=WorkStageResponse, status_code=201)
 async def create_stage(
+    current_user: CurrentUser,
     project_id: str,
     body: WorkStageCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     stage = WorkStage(
         id=str(uuid.uuid4()),
@@ -64,9 +64,9 @@ async def create_stage(
 
 @router.get("/with-positions", response_model=list[StageWithPositions])
 async def list_stages_with_positions(
+    current_user: CurrentUser,
     project_id: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     """Возвращает этапы с агрегированными плановыми объёмами из привязанных позиций.
     Один JOIN-запрос вместо N+1.
@@ -117,19 +117,19 @@ async def list_stages_with_positions(
 
 @router.get("/{stage_id}", response_model=WorkStageResponse)
 async def get_stage(
+    current_user: CurrentUser,
     stage_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     return await _get_stage_or_404(db, stage_id)
 
 
 @router.patch("/{stage_id}", response_model=WorkStageResponse)
 async def update_stage(
+    current_user: CurrentUser,
     stage_id: str,
     body: WorkStageUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     stage = await _get_stage_or_404(db, stage_id)
     data = body.model_dump(exclude_unset=True)
@@ -150,9 +150,9 @@ async def update_stage(
 
 @router.delete("/{stage_id}", status_code=204)
 async def delete_stage(
+    current_user: CurrentUser,
     stage_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     stage = await _get_stage_or_404(db, stage_id)
     await db.delete(stage)
@@ -163,10 +163,10 @@ async def delete_stage(
 
 @router.patch("/{stage_id}/assign-position", response_model=dict)
 async def assign_position(
+    current_user: CurrentUser,
     stage_id: str,
     body: StagePositionAssign,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     """Привязывает позицию сметы к этапу ГПР из URL, или открепляет (body.detach=True)."""
     # stage_id берём из URL — проверяем существование

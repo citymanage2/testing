@@ -21,9 +21,9 @@ async def _get_member_or_404(db: AsyncSession, member_id: str) -> ProjectMember:
 
 @router.get("", response_model=list[ProjectMemberResponse])
 async def list_members(
+    current_user: CurrentUser,
     project_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     rows = (await db.execute(
         select(ProjectMember)
@@ -35,10 +35,10 @@ async def list_members(
 
 @router.post("", response_model=ProjectMemberResponse, status_code=201)
 async def add_member(
+    current_user: CurrentUser,
     project_id: str,
     body: ProjectMemberCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     if body.role not in PROJECT_ROLES:
         raise HTTPException(status_code=422, detail=f"Роль должна быть одной из: {PROJECT_ROLES}")
@@ -68,11 +68,11 @@ async def add_member(
 
 @router.patch("/{member_id}", response_model=ProjectMemberResponse)
 async def update_member(
+    current_user: CurrentUser,
     project_id: str,
     member_id: str,
     body: ProjectMemberUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     member = await _get_member_or_404(db, member_id)
     if member.project_id != project_id:
@@ -88,10 +88,10 @@ async def update_member(
 
 @router.delete("/{member_id}", status_code=204)
 async def remove_member(
+    current_user: CurrentUser,
     project_id: str,
     member_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     member = await _get_member_or_404(db, member_id)
     if member.project_id != project_id:
