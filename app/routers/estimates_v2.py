@@ -1,7 +1,7 @@
 """CRUD-роутер для смет v2: Estimate → EstimateSection → EstimatePosition → PriceLayer."""
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.auth import get_current_user, CurrentUser
@@ -10,6 +10,7 @@ from app.models.estimate_v2 import (
     Estimate, EstimateSection, EstimatePosition, PriceLayer,
     ESTIMATE_STATUS_TRANSITIONS, ESTIMATE_TYPES, CALC_METHODS,
 )
+from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.schemas.estimate_v2 import (
     EstimateCreate, EstimateUpdate, EstimateStatusTransition, EstimateResponse,
@@ -39,15 +40,10 @@ async def _get_estimate_or_404(db: AsyncSession, estimate_id: str) -> Estimate:
 
 
 async def _check_project_access(db: AsyncSession, project_id: str, user_id: str) -> None:
-    """Проверить, что пользователь является участником проекта."""
-    result = await db.execute(
-        select(ProjectMember).where(
-            ProjectMember.project_id == project_id,
-            ProjectMember.user_id == user_id,
-        )
-    )
-    if not result.scalars().first():
-        raise HTTPException(status_code=403, detail="Нет доступа к проекту")
+    """Проверить, что проект существует (внутренняя система — доступ для всех авторизованных)."""
+    proj = await db.get(Project, project_id)
+    if not proj:
+        raise HTTPException(status_code=404, detail="Проект не найден")
 
 
 async def _get_estimate_with_access(db: AsyncSession, estimate_id: str, user_id: str) -> Estimate:
@@ -113,16 +109,17 @@ async def create_estimate(
 
 @router.get("", response_model=list[EstimateResponse])
 async def list_estimates_by_project(
-    project_id: str,
     current_user: CurrentUser,
+    project_id: str | None = Query(None),
+    status: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
-    await _check_project_access(db, project_id, current_user.id)
-    result = await db.execute(
-        select(Estimate)
-        .where(Estimate.project_id == project_id)
-        .order_by(Estimate.created_at.desc())
-    )
+    q = select(Estimate).order_by(Estimate.created_at.desc())
+    if project_id:
+        q = q.where(Estimate.project_id == project_id)
+    if status:
+        q = q.where(Estimate.status == status)
+    result = await db.execute(q)
     return result.scalars().all()
 
 
