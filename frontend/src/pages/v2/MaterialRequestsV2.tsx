@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import client from '../../api/client';
 import { materialRequestsApi, catalogV2, type MaterialRequest, type MaterialRequestItem, type CatalogItemV2 } from '../../api/v2';
-import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline, btnDanger, badge } from '../../ui';
+import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline, badge } from '../../ui';
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Черновик', submitted: 'Подана', approved: 'Одобрена',
@@ -204,7 +204,7 @@ export default function MaterialRequestsV2() {
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {NEXT_STATUSES[selectedReq.status]?.map(s => {
-                      const [color, bg] = STATUS_COLORS[s] ?? [C.textMuted, C.surfaceAlt];
+                      const [color] = STATUS_COLORS[s] ?? [C.textMuted, C.surfaceAlt];
                       return (
                         <button
                           key={s}

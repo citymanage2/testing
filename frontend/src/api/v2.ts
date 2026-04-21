@@ -254,7 +254,7 @@ export const financeV2Api = {
 // ─── AI Assistant v2 ──────────────────────────────────────────────────────────
 
 export const assistantV2Api = {
-  ask: (projectId: string, question: string, module: string, streamCallback?: (chunk: string) => void) => {
+  ask: (projectId: string, question: string, module: string) => {
     // Non-streaming path
     return client.post<AssistantResponse>(`/v2/projects/${projectId}/assistant`, {
       question, module,

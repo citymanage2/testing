@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import client from '../../api/client';
 import { assistantV2Api } from '../../api/v2';
-import { C, T, CARD, INPUT, LBL, btnPrimary, btnOutline } from '../../ui';
+import { C, T, CARD, INPUT, btnPrimary, btnOutline } from '../../ui';
 
 const MODULES = [
   { value: 'estimate', label: 'Сметы' },
@@ -89,8 +89,6 @@ export default function AssistantV2() {
       handleSend();
     }
   }
-
-  const projectName = (id: string) => projects.find(p => p.id === id)?.name ?? id;
 
   const QUICK_QUESTIONS = [
     'Как дела с маржой?',

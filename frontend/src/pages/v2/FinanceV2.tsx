@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import client from '../../api/client';
 import { financeV2Api, type ProjectPlanFact, type ProjectForecast, type ProjectAlert, type CompanyPL, type BudgetEntry } from '../../api/v2';
-import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline, badge } from '../../ui';
+import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline } from '../../ui';
 
 const fmt = (n?: number) => n == null ? '—' : n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-const fmtM = (n?: number) => n == null ? '—' : (n / 1_000_000).toFixed(2) + ' млн';
 const pct = (n?: number) => n == null ? '—' : `${n.toFixed(1)}%`;
 
 type Tab = 'project' | 'company';
@@ -175,7 +174,7 @@ export default function FinanceV2() {
               {alerts.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {alerts.map(alert => {
-                    const [color, bg] = ALERT_COLORS[alert.level] ?? [C.textMuted, C.surfaceAlt];
+                    const [color] = ALERT_COLORS[alert.level] ?? [C.textMuted, C.surfaceAlt];
                     return (
                       <div key={alert.id} style={{ ...CARD, display: 'flex', gap: 10, alignItems: 'flex-start', borderLeft: `4px solid ${color}`, padding: '10px 16px' }}>
                         <span style={{ color, fontSize: 16 }}>{alert.level === 'critical' ? '🚨' : alert.level === 'warning' ? '⚠' : 'ℹ'}</span>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { warehouseApi, catalogV2, type Warehouse, type StockItem, type StockMovement, type CatalogItemV2 } from '../../api/v2';
 import client from '../../api/client';
-import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline, btnDanger, badge } from '../../ui';
+import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline } from '../../ui';
 
 const MOVE_LABELS: Record<string, string> = {
   receipt: 'Приход', issue: 'Выдача', write_off: 'Списание', transfer: 'Перемещение',
@@ -125,7 +125,6 @@ export default function WarehouseV2() {
   const selectedWarehouse = warehouses.find(w => w.id === selectedWh);
   const projectName = (id?: string) => id ? (projects.find(p => p.id === id)?.name ?? id) : '—';
   const catalogName = (id: string) => catalog.find(c => c.id === id)?.name ?? id;
-  const catalogUnit = (id: string) => catalog.find(c => c.id === id)?.unit ?? '';
 
   if (loading) return <div style={{ padding: 32, color: C.textSec }}>Загрузка...</div>;
 
