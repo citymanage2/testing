@@ -624,12 +624,12 @@ async def delete_price_layer(
 
 @router.post("/import", response_model=dict, status_code=201)
 async def import_estimate_from_file(
+    current_user: CurrentUser,
     project_id: str = Form(..., description="ID проекта"),
     estimate_name: str = Form(..., description="Название создаваемой сметы"),
     source_name: str = Form("Смета заказчика", description="Название источника цен"),
     use_ai: bool = Form(True, description="Включить AI-нормализацию и сопоставление с каталогом"),
     file: UploadFile = File(...),
-    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     """
