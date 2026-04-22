@@ -640,8 +640,11 @@ async def import_estimate_from_file(
 
     Возвращает id созданной сметы и статистику.
     """
+    import logging as _logging
     from app.services.parse_service import parse_excel_client, parse_pdf_client, parse_docx_client
     from app.services.ai_pipeline_v2 import run_import_pipeline
+
+    _log = _logging.getLogger(__name__)
 
     await _check_project_access(db, project_id, current_user.id)
 
@@ -652,27 +655,37 @@ async def import_estimate_from_file(
     fname = file.filename.lower()
     content_type = file.content_type or ""
 
-    if fname.endswith(".xlsx") or "spreadsheetml" in content_type or "ms-excel" in content_type:
-        positions = parse_excel_client(data)
-    elif fname.endswith(".pdf") or "pdf" in content_type:
-        positions = await parse_pdf_client(data, file.filename)
-    elif fname.endswith(".docx") or fname.endswith(".doc") or "wordprocessingml" in content_type:
-        positions = await parse_docx_client(data, file.filename)
-    else:
-        raise HTTPException(status_code=400, detail="Поддерживаются только .xlsx, .pdf, .docx")
+    try:
+        if fname.endswith(".xlsx") or "spreadsheetml" in content_type or "ms-excel" in content_type:
+            positions = parse_excel_client(data)
+        elif fname.endswith(".pdf") or "pdf" in content_type:
+            positions = await parse_pdf_client(data, file.filename)
+        elif fname.endswith(".docx") or fname.endswith(".doc") or "wordprocessingml" in content_type:
+            positions = await parse_docx_client(data, file.filename)
+        else:
+            raise HTTPException(status_code=400, detail="Поддерживаются только .xlsx, .pdf, .docx")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _log.exception("parse error for file=%s", fname)
+        raise HTTPException(status_code=422, detail=f"Ошибка парсинга файла: {type(exc).__name__}: {exc}") from exc
 
     if not positions:
-        raise HTTPException(status_code=422, detail="Не удалось извлечь позиции из файла")
+        raise HTTPException(status_code=422, detail="Не удалось извлечь позиции из файла (0 строк)")
 
-    estimate, total, needs_review = await run_import_pipeline(
-        db=db,
-        project_id=project_id,
-        estimate_name=estimate_name,
-        positions=positions,
-        created_by=current_user.id,
-        source_name=source_name,
-        use_ai_normalization=use_ai,
-    )
+    try:
+        estimate, total, needs_review = await run_import_pipeline(
+            db=db,
+            project_id=project_id,
+            estimate_name=estimate_name,
+            positions=positions,
+            created_by=current_user.id,
+            source_name=source_name,
+            use_ai_normalization=use_ai,
+        )
+    except Exception as exc:
+        _log.exception("import pipeline error for project=%s", project_id)
+        raise HTTPException(status_code=500, detail=f"Ошибка создания сметы: {type(exc).__name__}: {exc}") from exc
 
     return {
         "estimate_id": estimate.id,
