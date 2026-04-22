@@ -80,12 +80,16 @@ export default function EstimatesV2() {
     setImporting(true);
     setImportError('');
     try {
-      const est = await estimatesV2.importFile(importProjectId, file, importName.trim(), importUseAi);
+      const resp = await estimatesV2.importFile(importProjectId, file, importName.trim(), importUseAi);
       setShowImport(false);
       setImportName('');
-      navigate(`/v2/estimates/${est.id}`);
+      if (resp.estimate_id) navigate(`/v2/estimates/${resp.estimate_id}`);
+      else { await load(); }
     } catch (e: unknown) {
-      setImportError(extractDetail(e, 'Ошибка импорта'));
+      const ax = e as { response?: { status?: number; data?: { detail?: unknown } } };
+      const status = ax?.response?.status;
+      const detail = extractDetail(e, 'Ошибка импорта');
+      setImportError(status ? `[${status}] ${detail}` : detail);
     } finally {
       setImporting(false);
     }

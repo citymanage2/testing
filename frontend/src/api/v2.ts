@@ -158,8 +158,9 @@ export const estimatesV2 = {
     fd.append('project_id', projectId);
     fd.append('estimate_name', estimateName);
     fd.append('use_ai', String(useAi));
-    // Don't set Content-Type manually — browser adds boundary automatically
-    return client.post<EstimateV2>('/v2/estimates/import', fd).then(r => r.data);
+    return client.post<{ estimate_id: string; status: string; total_positions: number; needs_review: number; message: string }>(
+      '/v2/estimates/import', fd,
+    ).then(r => r.data);
   },
   summary: (id: string) => client.get<EstimateSummary>(`/v2/estimates/${id}/summary`).then(r => r.data),
   setStatus: (id: string, status: string) =>
