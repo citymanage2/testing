@@ -318,9 +318,17 @@ async def run_import_pipeline(
                 _CATALOG_LIMIT,
             )
 
-    # Нормализация
+    # Нормализация — таймаут 20 сек чтобы уложиться в ограничения хостинга
     if use_ai_normalization and positions:
-        normalized = await normalize_positions(positions, catalog_items)
+        import asyncio
+        try:
+            normalized = await asyncio.wait_for(
+                normalize_positions(positions, catalog_items),
+                timeout=20.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("run_import_pipeline: AI-нормализация превысила 20 сек, продолжаем без AI.")
+            normalized = [NormalizedPosition(p, needs_review=True) for p in positions]
     else:
         # Без AI — заворачиваем ParsedPosition в NormalizedPosition как есть
         normalized = [NormalizedPosition(p, needs_review=(p.client_work_price == 0 and p.row_type == "item")) for p in positions]
