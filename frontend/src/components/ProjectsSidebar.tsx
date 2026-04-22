@@ -84,7 +84,8 @@ export default function ProjectsSidebar({ collapsed }: Props = {}) {
 
   async function addProject() {
     const n = prompt('Название проекта:');
-    if (n?.trim()) { await client.post('/projects', { name: n.trim() }); load(); }
+    if (!n?.trim()) return;
+    try { await client.post('/projects', { name: n.trim() }); load(); } catch { alert('Ошибка создания проекта'); }
   }
 
   if (collapsed) {

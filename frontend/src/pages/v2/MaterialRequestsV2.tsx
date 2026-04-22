@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import client from '../../api/client';
+import client, { extractDetail } from '../../api/client';
 import { materialRequestsApi, catalogV2, type MaterialRequest, type MaterialRequestItem, type CatalogItemV2 } from '../../api/v2';
 import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline, badge } from '../../ui';
 
@@ -98,8 +98,7 @@ export default function MaterialRequestsV2() {
       await load();
       await loadItems(req);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? 'Ошибка создания заявки');
+            setError(extractDetail(e, 'Ошибка создания заявки'));
     } finally {
       setCreating(false);
     }
@@ -111,8 +110,7 @@ export default function MaterialRequestsV2() {
       setRequests(rs => rs.map(r => r.id === reqId ? updated : r));
       if (selectedReq?.id === reqId) setSelectedReq(updated);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? 'Ошибка перехода статуса');
+            setError(extractDetail(e, 'Ошибка перехода статуса'));
     }
   }
 
@@ -129,8 +127,7 @@ export default function MaterialRequestsV2() {
       const its = await materialRequestsApi.items(selectedReq.id);
       setItems(its);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? 'Ошибка добавления позиции');
+            setError(extractDetail(e, 'Ошибка добавления позиции'));
     } finally {
       setAddingItem(false);
     }

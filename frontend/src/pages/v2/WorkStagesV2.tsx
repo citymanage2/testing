@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import client from '../../api/client';
+import client, { extractDetail } from '../../api/client';
 import { workStages, type WorkStage } from '../../api/v2';
 import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline, btnDanger, btnGhost, badge } from '../../ui';
 
@@ -76,8 +76,7 @@ export default function WorkStagesV2() {
       setForm({ name: '', start_date: '', end_date: '', order_index: '0' });
       await load();
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? 'Ошибка создания этапа');
+            setError(extractDetail(e, 'Ошибка создания этапа'));
     } finally {
       setCreating(false);
     }
@@ -91,8 +90,7 @@ export default function WorkStagesV2() {
       setEditStage(null);
       await load();
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? 'Ошибка сохранения');
+            setError(extractDetail(e, 'Ошибка сохранения'));
     } finally {
       setSaving(false);
     }

@@ -152,14 +152,14 @@ export const estimatesV2 = {
   get: (id: string) => client.get<EstimateV2>(`/v2/estimates/${id}`).then(r => r.data),
   create: (data: { project_id: string; name: string }) =>
     client.post<EstimateV2>('/v2/estimates', data).then(r => r.data),
-  importFile: (projectId: string, file: File, useAi = true) => {
+  importFile: (projectId: string, file: File, estimateName: string, useAi = true) => {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('project_id', projectId);
+    fd.append('estimate_name', estimateName);
     fd.append('use_ai', String(useAi));
-    return client.post<EstimateV2>('/v2/estimates/import', fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }).then(r => r.data);
+    // Don't set Content-Type manually — browser adds boundary automatically
+    return client.post<EstimateV2>('/v2/estimates/import', fd).then(r => r.data);
   },
   summary: (id: string) => client.get<EstimateSummary>(`/v2/estimates/${id}/summary`).then(r => r.data),
   setStatus: (id: string, status: string) =>

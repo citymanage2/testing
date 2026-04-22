@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import client from '../../api/client';
+import client, { extractDetail } from '../../api/client';
 import { assistantV2Api } from '../../api/v2';
 import { C, T, CARD, INPUT, btnPrimary, btnOutline } from '../../ui';
 
@@ -69,11 +69,10 @@ export default function AssistantV2() {
       };
       setMessages(ms => [...ms, assistantMsg]);
     } catch (e: unknown) {
-      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        text: detail ?? 'Ошибка ассистента. Попробуйте позже.',
+        text: extractDetail(e, 'Ошибка ассистента. Попробуйте позже.'),
         timestamp: new Date(),
         error: true,
       };

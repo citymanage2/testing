@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import client from '../../api/client';
+import client, { extractDetail } from '../../api/client';
 import { estimatesV2, type EstimateV2 } from '../../api/v2';
 import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline, badge } from '../../ui';
 
@@ -32,6 +32,7 @@ export default function EstimatesV2() {
 
   const [showImport, setShowImport] = useState(false);
   const [importProjectId, setImportProjectId] = useState(projectIdFilter);
+  const [importName, setImportName] = useState('');
   const [importUseAi, setImportUseAi] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
@@ -75,16 +76,16 @@ export default function EstimatesV2() {
 
   async function handleImport() {
     const file = fileRef.current?.files?.[0];
-    if (!file || !importProjectId) { setImportError('Выберите файл и проект'); return; }
+    if (!file || !importProjectId || !importName.trim()) { setImportError('Выберите файл, проект и укажите название'); return; }
     setImporting(true);
     setImportError('');
     try {
-      const est = await estimatesV2.importFile(importProjectId, file, importUseAi);
+      const est = await estimatesV2.importFile(importProjectId, file, importName.trim(), importUseAi);
       setShowImport(false);
+      setImportName('');
       navigate(`/v2/estimates/${est.id}`);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setImportError(msg ?? 'Ошибка импорта');
+      setImportError(extractDetail(e, 'Ошибка импорта'));
     } finally {
       setImporting(false);
     }
@@ -224,6 +225,10 @@ export default function EstimatesV2() {
                   <option value="">— выберите —</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
+              </label>
+              <label style={LBL}>
+                Название сметы
+                <input style={INPUT} value={importName} onChange={e => setImportName(e.target.value)} placeholder="Смета заказчика" />
               </label>
               <label style={LBL}>
                 Файл (Excel, PDF, DOCX)

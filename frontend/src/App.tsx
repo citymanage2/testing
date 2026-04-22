@@ -1,7 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import TooltipProvider from './components/TooltipProvider';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import TaskCreate from './pages/TaskCreate';
 import TaskStatus from './pages/TaskStatus';
@@ -23,10 +25,22 @@ import MaterialRequestsV2 from './pages/v2/MaterialRequestsV2';
 import FinanceV2 from './pages/v2/FinanceV2';
 import AssistantV2 from './pages/v2/AssistantV2';
 
+function AuthLogoutListener() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const handler = () => navigate('/login', { replace: true });
+    window.addEventListener('auth:logout', handler);
+    return () => window.removeEventListener('auth:logout', handler);
+  }, [navigate]);
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <AuthLogoutListener />
       <TooltipProvider />
+      <ErrorBoundary>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute />}>
@@ -58,6 +72,7 @@ export default function App() {
           </Route>
         </Route>
       </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

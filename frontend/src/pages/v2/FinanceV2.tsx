@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import client from '../../api/client';
+import client, { extractDetail } from '../../api/client';
 import { financeV2Api, type ProjectPlanFact, type ProjectForecast, type ProjectAlert, type CompanyPL, type BudgetEntry } from '../../api/v2';
 import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline } from '../../ui';
 
@@ -109,8 +109,7 @@ export default function FinanceV2() {
       const bg = await financeV2Api.budgetEntries(projectId);
       setBudget(bg);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? 'Ошибка добавления бюджетной строки');
+            setError(extractDetail(e, 'Ошибка добавления бюджетной строки'));
     } finally {
       setAddingBudget(false);
     }

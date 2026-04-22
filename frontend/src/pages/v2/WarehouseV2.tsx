@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { warehouseApi, catalogV2, type Warehouse, type StockItem, type StockMovement, type CatalogItemV2 } from '../../api/v2';
-import client from '../../api/client';
+import client, { extractDetail } from '../../api/client';
 import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline } from '../../ui';
 
 const MOVE_LABELS: Record<string, string> = {
@@ -94,8 +94,7 @@ export default function WarehouseV2() {
       setShowCreate(false);
       setCreateForm({ name: '', project_id: '', address: '' });
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? 'Ошибка создания склада');
+            setError(extractDetail(e, 'Ошибка создания склада'));
     } finally {
       setCreating(false);
     }
@@ -115,8 +114,7 @@ export default function WarehouseV2() {
       setMovForm({ catalog_item_id: '', movement_type: 'receipt', quantity: '', note: '' });
       await loadWarehouseData(selectedWh);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? 'Ошибка добавления движения');
+            setError(extractDetail(e, 'Ошибка добавления движения'));
     } finally {
       setAddingMov(false);
     }

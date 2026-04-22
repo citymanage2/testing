@@ -1,3 +1,4 @@
+import { extractDetail } from '../../api/client';
 import { useEffect, useState } from 'react';
 import { catalogV2, priceSources, type CatalogItemV2, type PriceSource } from '../../api/v2';
 import { C, T, CARD, TH, TD, INPUT, LBL, OVERLAY, MODAL, btnPrimary, btnOutline, btnDanger } from '../../ui';
@@ -75,8 +76,7 @@ export default function CatalogV2() {
       setShowCreate(false);
       await load();
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? 'Ошибка сохранения');
+            setError(extractDetail(e, 'Ошибка сохранения'));
     } finally {
       setSaving(false);
     }

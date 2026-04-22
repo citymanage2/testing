@@ -1,3 +1,4 @@
+import { extractDetail } from '../../api/client';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { estimatesV2, type EstimateV2, type EstimatePosition, type EstimateSummary } from '../../api/v2';
@@ -90,8 +91,7 @@ export default function EstimateDetailV2() {
       const updated = await estimatesV2.setStatus(id, status);
       setEstimate(updated);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? 'Ошибка смены статуса');
+            setError(extractDetail(e, 'Ошибка смены статуса'));
     } finally {
       setChangingStatus(false);
     }
@@ -108,8 +108,7 @@ export default function EstimateDetailV2() {
       setShowCalc(false);
       await load();
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? 'Ошибка расчёта');
+            setError(extractDetail(e, 'Ошибка расчёта'));
     } finally {
       setCalculating(false);
     }
